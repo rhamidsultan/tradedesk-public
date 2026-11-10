@@ -57,13 +57,21 @@ network) and the invite code it printed.
 3. Every 7 days press Run again (same Wi-Fi). The app shows the days left and reminds you the day before;
    the server reminds you on Saturdays. Your sign-in and settings stay.
 
-## Put it on the server (later, Hamid's call — not done)
+## Put it on the server
 
-Nothing has been deployed. When ready, on the server: a `tradedesk` user, Postgres database `td2`, code cloned to
-`/opt/td2/app`, a venv in `/opt/td2/venv` with `pip install -e "rebuild/server[postgres]"`, secrets in
-`/opt/td2/secrets/td2.env` (see `server/ops/td2.env.example`; make the master key with
-`python -m tdserver.cli new-master-key`), the two systemd units in `server/ops/`, and a Caddy site block
-(`server/ops/Caddyfile.example`). Then:
+Double-click `scripts/install-td2-server.command` on the Mac. It uses the server address and SSH key the Algo Lab
+launchers saved in `~/.algo-trading/server.env` and runs `rebuild/server/ops/install_server.sh` on the server
+(safe to run again). It sets up, without touching Algo Lab, the portfolio dashboard or the old TradeDesk:
+
+- a `tradedesk` user, PostgreSQL database `td2`, code from this repo's `main` in `/opt/td2/app`, a venv in `/opt/td2/venv`;
+- `/opt/td2/secrets/td2.env` (made once: master key, database password; back it up privately);
+- a copy of `/opt/tradedesk/store` as the market data, read access to the IBKR snapshot, a copy of the dashboard's
+  portfolio history;
+- all `td2-*` services (live orders stay OFF: no `/etc/td2/live-ENABLED`), and the Caddy site
+  `https://td2.<your-ip-with-dashes>.sslip.io`;
+- an owner invite code for the iPhone (printed, and kept in `~/.algo-trading/td2-install.log` on the Mac).
+
+After that:
 
 - **Kite Connect app:** set its redirect URL to `https://<server>/kite/callback`. This replaces the redirect the
   portfolio app uses today, so do it only when switching over (or create a second Kite Connect app).
