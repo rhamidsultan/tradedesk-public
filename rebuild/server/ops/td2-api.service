@@ -1,0 +1,19 @@
+[Unit]
+Description=TradeDesk rebuild API (phase 1, no order code)
+After=network-online.target postgresql.service
+
+[Service]
+User=tradedesk
+WorkingDirectory=/opt/td2/app/rebuild/server
+EnvironmentFile=/opt/td2/secrets/td2.env
+ExecStartPre=/opt/td2/venv/bin/alembic upgrade head
+ExecStart=/opt/td2/venv/bin/uvicorn --factory tdserver.app:create_app --host 127.0.0.1 --port 8720 --proxy-headers --forwarded-allow-ips 127.0.0.1 --no-access-log
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/td2/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

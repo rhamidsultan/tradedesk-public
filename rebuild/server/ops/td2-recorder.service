@@ -1,0 +1,21 @@
+[Unit]
+Description=TradeDesk rebuild recorder (Zerodha price stream -> 1-minute and 1-second bars; read-only, no orders)
+After=network-online.target td2-api.service
+
+[Service]
+User=tradedesk
+WorkingDirectory=/opt/td2/app/rebuild/server
+EnvironmentFile=/opt/td2/secrets/td2.env
+ExecStart=/opt/td2/venv/bin/python -m tdserver.recorder
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+# the store is the only place it writes
+ReadWritePaths=/opt/td2/data /opt/td2/store
+PrivateTmp=true
+MemoryMax=600M
+
+[Install]
+WantedBy=multi-user.target

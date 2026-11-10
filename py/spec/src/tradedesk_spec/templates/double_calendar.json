@@ -1,0 +1,37 @@
+{
+  "id": "double_calendar",
+  "name": "Double calendar (sell this week, buy next week)",
+  "version": 1,
+  "kind": "python",
+  "module": "double_calendar",
+  "instrument": {
+    "underlying": "NIFTY",
+    "timeframe": "1m"
+  },
+  "schedule": {
+    "days": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri"
+    ],
+    "start": "09:16",
+    "no_new_after": "15:00",
+    "exit_by": "15:29",
+    "hold_overnight": true,
+    "expiry_exit_time": "15:15"
+  },
+  "risk": {
+    "stop_loss": {
+      "on": "premium",
+      "type": "multiple",
+      "value": 3
+    },
+    "max_lots": 2,
+    "max_loss_per_day": 8000,
+    "max_trades_per_day": 4
+  },
+  "params": {},
+  "notes": "Algo Lab double_calendar: sells this week's ATM-ish call and put and buys next week's same strikes; profits from faster decay of the near week. Short legs have a 3x backstop at Kite; bought legs are hedges."
+}

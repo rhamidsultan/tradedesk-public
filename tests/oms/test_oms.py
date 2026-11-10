@@ -515,3 +515,178 @@ def test_wing_not_sold_while_short_still_entering(env):
     b.fill(entry(b, om, WING).order_id); om.poll(); om.poll(); om.poll()      # short sent, not filled yet
     assert om._legs()[0]["status"] == "open"
     assert not [x for x in b.calls if x[0] == "place" and x[2] == "SELL" and x[1] != entry(b, om, CE).tag]
+
+
+def test_carried_leg_is_not_exited_before_the_open(tmp_path):
+    """Review 3 Nov P1-1: yesterday's DAY stop expires overnight; before today's start() the leg waits (no
+    sl_missing exit at a stale price); start() re-places the stop after the open."""
+    b = FakeBroker()
+    b.quotes = {CE: Quote(39.5, 40.0, 40.0)}
+    c = Clock()
+    om = OrderManager(b, tmp_path / "oms.db", Limits(max_lots=2, max_orders_day=20, daily_loss=8000), clock=c, sleep=c.sleep)
+    assert om.start()
+    om.armed = True
+    om.enter("s1", [LegReq(CE, "NFO", "SELL", 1, 65, 40.0, 60.0)])
+    b.fill(entry(b, om, CE).order_id); om.poll()
+    old_sl = sl_of(b, om, CE)
+    c.t += 86400                                     # next day, before the open
+    b.book[old_sl.order_id].status = "CANCELLED"    # Zerodha expires DAY orders
+    om.ready = False
+    places = len([x for x in b.calls if x[0] == "place"])
+    om.poll()
+    assert len([x for x in b.calls if x[0] == "place"]) == places            # no exit order sent pre-open
+    assert om.snapshot()["legs"][0]["status"] == "open"
+    assert om.start()                                                        # after the open: a fresh stop
+    assert sl_of(b, om, CE).order_id != old_sl.order_id
+
+
+def test_market_closed_no_exit_orders_and_no_missing_stop(tmp_path):
+    """Re-review N2: after the close and on holidays Zerodha expires the DAY stop; nothing is sent until the open."""
+    b = FakeBroker()
+    b.quotes = {CE: Quote(39.5, 40.0, 40.0)}
+    c = Clock()
+    state = {"open": True}
+    om = OrderManager(b, tmp_path / "oms.db", Limits(max_lots=2, max_orders_day=20, daily_loss=8000), clock=c,
+                      sleep=c.sleep, market_open=lambda: state["open"])
+    assert om.start()
+    om.armed = True
+    om.enter("s1", [LegReq(CE, "NFO", "SELL", 1, 65, 40.0, 60.0)])
+    b.fill(entry(b, om, CE).order_id); om.poll()
+    sl = sl_of(b, om, CE)
+    state["open"] = False                              # 15:30 and later, same day
+    b.book[sl.order_id].status = "CANCELLED"           # Zerodha expires the DAY stop
+    n = len(b.calls)
+    om.poll(); om.poll()
+    assert om.snapshot()["legs"][0]["status"] == "open"                      # not exited as "stop missing"
+    assert all(x[0] not in ("place", "modify") for x in b.calls[n:])
+    om.exit_leg(om.snapshot()["legs"][0]["id"], "manual")   # an exit asked while closed waits for the open
+    assert all(x[0] not in ("place", "modify") for x in b.calls[n:])
+    state["open"] = True
+    om.poll()
+    assert any(x[0] == "place" for x in b.calls[n:])        # sent at the open
+
+
+def test_evening_restart_keeps_carried_legs_and_protects_them_at_the_open(tmp_path):
+    """Third review P1-A: a restart after the close never exits carried legs; a refused fresh stop is retried."""
+    from tradedesk_oms.broker import Rejected
+    b = FakeBroker()
+    b.quotes = {CE: Quote(39.5, 40.0, 40.0)}
+    c = Clock()
+    state = {"open": True}
+    mk = lambda: OrderManager(b, tmp_path / "oms.db", Limits(max_lots=2, max_orders_day=20, daily_loss=8000), clock=c,
+                              sleep=c.sleep, market_open=lambda: state["open"])
+    om = mk()
+    assert om.start()
+    om.armed = True
+    om.enter("s1", [LegReq(CE, "NFO", "SELL", 1, 65, 40.0, 60.0)])
+    b.fill(entry(b, om, CE).order_id); om.poll()
+    b.book[sl_of(b, om, CE).order_id].status = "CANCELLED"     # Zerodha expires the DAY stop at the close
+    state["open"] = False
+    om2 = mk()                                                  # restart at 18:00
+    assert om2.start() is False
+    om2.poll()
+    assert om2.snapshot()["legs"][0]["status"] == "open"
+    state["open"] = True                                        # next morning: the first stop is refused
+    c.t += 86400
+    b.fail_next = [Rejected("RMS: not allowed now")]
+    assert om2.start() is False and om2.snapshot()["legs"][0]["status"] == "open"
+    assert om2.start() is True                                  # retried: a fresh stop is working
+    assert sl_of(b, om2, CE).status == "TRIGGER PENDING"
+
+
+def test_carried_leg_exits_when_the_price_gapped_through_its_stop(tmp_path):
+    from tradedesk_oms.broker import Rejected
+    b = FakeBroker()
+    b.quotes = {CE: Quote(39.5, 40.0, 40.0)}
+    c = Clock()
+    om = OrderManager(b, tmp_path / "oms.db", Limits(max_lots=2, max_orders_day=20, daily_loss=8000), clock=c, sleep=c.sleep)
+    assert om.start()
+    om.armed = True
+    om.enter("s1", [LegReq(CE, "NFO", "SELL", 1, 65, 40.0, 60.0)])
+    b.fill(entry(b, om, CE).order_id); om.poll()
+    b.book[sl_of(b, om, CE).order_id].status = "CANCELLED"
+    c.t += 86400
+    b.quotes = {CE: Quote(70.0, 70.5, 70.5)}                    # gap open above the 60 trigger
+    b.fail_next = [Rejected("trigger price below last price")]
+    om.start()
+    assert om.snapshot()["legs"][0]["status"] == "exiting"
+
+
+def test_interrupt_while_the_entry_is_in_flight_is_adopted_and_protected(tmp_path):
+    """Review B1: Ctrl-C (or a crash) during the entry request; the order reached the broker and fills later."""
+    class Interrupting(FakeBroker):
+        boom = True
+        def place(self, req):
+            oid = super().place(req)
+            if self.boom and req.order_type == "LIMIT":
+                self.boom = False
+                raise KeyboardInterrupt                     # after the broker accepted it
+            return oid
+    b = Interrupting()
+    b.quotes = {CE: Quote(39.5, 40.0, 40.0)}
+    c = Clock()
+    om = OrderManager(b, tmp_path / "oms.db", Limits(max_lots=2, max_orders_day=20, daily_loss=8000), clock=c, sleep=c.sleep)
+    assert om.start()
+    om.armed = True
+    with pytest.raises(KeyboardInterrupt):
+        om.enter("s1", [LegReq(CE, "NFO", "BUY", 1, 65, 40.0, 24.0)])
+    lg = om.snapshot()["legs"][0]
+    assert lg["status"] == "entering" and lg["entry_tag"]           # known before the request went out
+    order = next(o for o in b.book.values() if o.symbol == CE)
+    b.fill(order.order_id)
+    c.t += 1
+    om.poll(); om.poll()
+    lg = om.snapshot()["legs"][0]
+    assert lg["status"] == "open" and lg["sl_tag"]                  # adopted by tag and protected at the broker
+    assert sl_of(b, om, CE).status == "TRIGGER PENDING"
+
+
+def test_kill_on_an_entry_still_in_flight_cancels_it_at_the_broker(tmp_path):
+    """Third review B2: interrupt during the entry request, then Stop all, order never fills: it must be cancelled."""
+    class Interrupting(FakeBroker):
+        boom = True
+        def place(self, req):
+            oid = super().place(req)
+            if self.boom and req.order_type == "LIMIT":
+                self.boom = False
+                raise KeyboardInterrupt
+            return oid
+    b = Interrupting()
+    b.quotes = {CE: Quote(39.5, 40.0, 40.0)}
+    c = Clock()
+    om = OrderManager(b, tmp_path / "oms.db", Limits(max_lots=2, max_orders_day=20, daily_loss=8000), clock=c, sleep=c.sleep)
+    assert om.start()
+    om.armed = True
+    with pytest.raises(KeyboardInterrupt):
+        om.enter("s1", [LegReq(CE, "NFO", "BUY", 1, 65, 40.0, 24.0)])
+    om.kill("k1")
+    for _ in range(40):
+        c.t += 1
+        om.poll()
+    order = next(o for o in b.book.values() if o.symbol == CE and o.order_type == "LIMIT")
+    assert order.status == "CANCELLED"
+    assert om.snapshot()["legs"][0]["status"] == "failed" and not b.positions()
+
+
+def test_old_failed_legs_cost_no_extra_broker_calls(tmp_path):
+    """Fourth review R1: failed legs from earlier days must not each trigger an order-book read on every poll."""
+    b = FakeBroker()
+    b.quotes = {CE: Quote(39.5, 40.0, 40.0)}
+    c = Clock()
+    om = OrderManager(b, tmp_path / "oms.db", Limits(max_lots=10, max_orders_day=50, daily_loss=80000), clock=c, sleep=c.sleep)
+    assert om.start()
+    om.armed = True
+    for i in range(10):                                   # ten entries that never fill and are given up
+        om.enter(f"s{i}", [LegReq(CE, "NFO", "BUY", 1, 65, 40.0, 24.0)])
+        c.t += 40
+        om.poll()
+    assert all(l["status"] == "failed" for l in om.snapshot()["legs"])
+    c.t += 86400                                          # next day: yesterday's orders are gone from the book
+    b.book.clear()
+    om.ready = False
+    om.start()
+    calls = []
+    real = b.orders
+    b.orders = lambda: (calls.append(1), real())[1]
+    om.poll()
+    assert len(calls) <= 2

@@ -1,0 +1,3 @@
+// Copy to Local.xcconfig and fill in. The free Apple account needs a bundle id no one else uses.
+TD_TEAM_ID = ABCDE12345
+TD_BUNDLE_ID = com.yourname.tradedesk

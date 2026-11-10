@@ -1,0 +1,19 @@
+[Unit]
+Description=TradeDesk rebuild worker (alerts and reminders)
+After=td2-api.service
+
+[Service]
+User=tradedesk
+WorkingDirectory=/opt/td2/app/rebuild/server
+EnvironmentFile=/opt/td2/secrets/td2.env
+ExecStart=/opt/td2/venv/bin/python -m tdserver.worker
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/td2/data /opt/td2/store
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

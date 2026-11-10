@@ -1,0 +1,20 @@
+[Unit]
+Description=TradeDesk rebuild backtest queue (one run at a time, each in a memory-limited child process)
+After=network-online.target td2-api.service
+
+[Service]
+User=tradedesk
+WorkingDirectory=/opt/td2/app/rebuild/server
+EnvironmentFile=/opt/td2/secrets/td2.env
+ExecStart=/opt/td2/venv/bin/python -m tdserver.research.jobs
+Restart=always
+RestartSec=5
+Nice=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/td2/data /opt/td2/store
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

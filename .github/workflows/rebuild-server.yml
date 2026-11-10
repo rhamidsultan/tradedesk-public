@@ -1,0 +1,34 @@
+name: rebuild server tests
+on:
+  pull_request:
+    paths: ["rebuild/server/**", "py/**", "tests/engine/**", "tests/oms/**", ".github/workflows/rebuild-server.yml"]
+  push:
+    branches: [main]
+    paths: ["rebuild/server/**", "py/**"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: rebuild/server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install the shared packages (store, spec, engine) and the server
+        run: |
+          pip install -e ../../py/marketcal -e ../../py/marketdata -e ../../py/spec -e ../../py/strategies -e ../../py/engine -e ../../py/oms
+          pip install -e ".[dev]"
+      - run: python -m pytest -q
+      - name: Engine golden tests (classic fills unchanged, honest fills)
+        working-directory: .
+        run: python -m pytest -q tests/engine tests/oms
+      - name: No secrets or data files committed
+        working-directory: rebuild
+        run: |
+          bad=$(git ls-files | grep -E '(\.db$|\.env$|\.pem$|\.p8$|secrets\.ya?ml$|token\.json$|Local\.xcconfig$|\.mobileprovision$)' || true)
+          if [ -n "$bad" ]; then echo "Remove these files: $bad"; exit 1; fi

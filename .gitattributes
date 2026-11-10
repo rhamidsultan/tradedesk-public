@@ -1,0 +1,4 @@
+# left out of "Share a clean copy of the code" (git archive): owner notes, reviews and server names
+CLAUDE.md export-ignore
+.claude export-ignore
+docs/reviews export-ignore

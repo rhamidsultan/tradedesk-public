@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block bar %}
+<form method="post" action="/console/logout" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">Sign out</button></form>
+{% endblock %}
+{% block main %}
+{% set m = s.market %}
+{% if kite_result == 'ok' %}<p class="banner ok">Kite login done for today.</p>
+{% elif kite_result == 'no_keys' %}<p class="banner warn">Add your Kite API key in the app first (More › Broker).</p>
+{% elif kite_result == 'wrong_account' %}<p class="banner warn">That was a different Zerodha account from the one saved for {{ user.name }}. Log in with your own client ID.</p>
+{% elif kite_result %}<p class="banner warn">Kite login {{ kite_result }}. Try again.</p>{% endif %}
+<p class="muted">Signed in as <b>{{ user.name }}</b></p>
+{% if stop_result %}<p class="banner">Nothing is running yet, so there was nothing to stop. Stop all becomes active when live trading is built.</p>{% endif %}
+
+<section class="grid">
+  <div class="card">
+    <h2>Market</h2>
+    <p class="big state-{{ m.state }}">{{ {'open':'Open','pre_open':'Pre-open','fo_only':'F&O only','closed':'Closed'}[m.state] }}</p>
+    {% if m.next_open %}<p class="muted">Next open {{ m.next_open | ist }}</p>{% else %}<p class="muted">F&amp;O closes {{ m.fo_close | ist_time }}</p>{% endif %}
+  </div>
+  <div class="card">
+    <h2>Zerodha</h2>
+    {% if not s.kite.set_up %}
+      <p class="big">Not set up</p><p class="muted">Add the API key in the app.</p>
+    {% elif s.kite.connected_today %}
+      <p class="big ok">Logged in today</p><p class="muted">{{ s.kite.client_id }}</p>
+    {% else %}
+      <p class="big warn">Login needed</p>
+      <form method="post" action="/console/kite"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Log in to Kite</button></form>
+    {% endif %}
+  </div>
+  <div class="card">
+    <h2>Paper and live</h2>
+    <p class="big">Not built yet</p><p class="muted">Arrives in phases 4 and 5.</p>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Open alerts ({{ alerts | length }})</h2>
+  {% for a in alerts %}
+  <div class="alert lvl-{{ a.level }}">
+    <div><b>{{ a.title }}</b><br><span class="muted">{{ a.created_at | ist }} · {{ a.category }}{% if a.repeating %} · repeating{% endif %}</span>{% if a.body %}<br>{{ a.body }}{% endif %}</div>
+    <form method="post" action="/console/ack/{{ a.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Acknowledge</button></form>
+  </div>
+  {% else %}
+  <p class="muted">No open alerts.</p>
+  {% endfor %}
+</section>
+
+<section class="card danger">
+  <h2>Stop all</h2>
+  <p>Closes every live position and blocks new orders. Nothing runs yet in this version.</p>
+  <form method="post" action="/console/stop-all" onsubmit="return confirm('Stop all trading?')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="stop">Stop all</button></form>
+</section>
+<p class="muted foot">Server time {{ s.server_time_ist | ist }} · v{{ s.version }}</p>
+{% endblock %}

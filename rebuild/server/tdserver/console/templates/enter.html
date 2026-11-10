@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block main %}
+<section class="card narrow">
+  <h1>Open the console</h1>
+  <form method="post" action="/console/enter">
+    <input type="hidden" name="t" value="{{ t }}">
+    <button>Continue</button>
+  </form>
+</section>
+{% endblock %}

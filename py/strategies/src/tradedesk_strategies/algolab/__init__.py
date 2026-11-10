@@ -1,1 +1,1 @@
-"""Algo Lab strategies (copied from rhamidsultan/algotrading @ 18bb325) run unchanged through tradedesk_engine.pyrun."""
+"""Algo Lab strategies (copied from rhamidsultan/algotrading @ 18bb325; double_calendar, event_iron_fly, intraday_straddle, intraday_strangle, premium_strangle, put_credit_spread added from @ 77d1fae on 3 Nov 2026) run unchanged through tradedesk_engine.pyrun."""

@@ -13,7 +13,7 @@ from tradedesk_engine import Backtest
 from tradedesk_engine.data import StoreFeed
 from tradedesk_spec import load_template
 
-ALL = ["opening_move_itm", "open_high_retest", "expiry_doubler", "iron_fly", "short_straddle", "straddle_trend_switch", "blaze_butterfly"]
+ALL = [t for t in __import__("tradedesk_spec").templates() if load_template(t).kind == "python"]
 
 
 def market(tmp_path, rally=True):

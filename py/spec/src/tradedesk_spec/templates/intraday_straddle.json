@@ -1,0 +1,37 @@
+{
+  "id": "intraday_straddle",
+  "name": "Intraday short ATM straddle",
+  "version": 1,
+  "kind": "python",
+  "module": "intraday_straddle",
+  "instrument": {
+    "underlying": "NIFTY",
+    "timeframe": "1m"
+  },
+  "schedule": {
+    "days": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri"
+    ],
+    "start": "09:16",
+    "no_new_after": "15:00",
+    "exit_by": "15:15",
+    "hold_overnight": false,
+    "expiry_exit_time": "15:15"
+  },
+  "risk": {
+    "stop_loss": {
+      "on": "premium",
+      "type": "multiple",
+      "value": 2
+    },
+    "max_lots": 2,
+    "max_loss_per_day": 8000,
+    "max_trades_per_day": 2
+  },
+  "params": {},
+  "notes": "Algo Lab intraday_straddle: sells the ATM call and put in the morning and closes both by the exit time. Unlimited risk between stops: each short leg has a 2x premium stop at Kite."
+}

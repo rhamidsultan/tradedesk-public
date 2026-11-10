@@ -214,6 +214,11 @@ class PyCtx:
     def sell(self, c, lots: int = 1, reason: str = "", group: str = ""):
         return self._order(c, "SELL", lots, reason, group)
 
+    def open_legs(self, legs: list) -> list:
+        """Several legs of one entry: [(contract, "BUY" | "SELL", lots, reason, group), ...]. Backtests take them one by
+        one, like separate buy()/sell() calls (Algo Lab does the same; live sends them together). Returns the fills."""
+        return [self._order(c, side, lots, reason, group) for c, side, lots, reason, group in legs]
+
     def close(self, c, reason: str = ""):
         tc = self._td(c)
         sym = f"{self.u}{c.expiry:%y%m%d}{int(c.strike)}{c.right}"

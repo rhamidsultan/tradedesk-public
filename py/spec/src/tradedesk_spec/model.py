@@ -148,6 +148,15 @@ class Costs(_M):
                                                        description="limit = Zerodha SL-limit: may stay unfilled in a spike")
     sl_limit_buffer_pct: float = Field(default=10, gt=0, description="SL-limit price = trigger ± this %")
     skip_thin: bool = Field(default=False, description="skip entries larger than 10% of the option's last 5 minutes' volume")
+    # Algo Lab's honest fills (PR #57), used by the rebuild server by default; "classic" keeps the v0 model
+    fill_model: Literal["classic", "honest"] = Field(
+        default="classic", description="honest = minimum spread on cheap options, no fill at a trade older than "
+                                       "fill_max_age_min, decisions only on prices known at the time")
+    min_half_spread: list[tuple[float, float]] = Field(
+        default=[(20, 0.10), (100, 0.20)],
+        description="honest: a fill pays at least this much per side (Rs) when the premium is below the first number")
+    fill_max_age_min: int = Field(default=3, ge=1, le=30, description="honest: oldest trade a fill may use")
+    cost_stress: float = Field(default=1.0, ge=0.5, le=5, description="honest: x the slippage and spread")
 
 
 class Strategy(_M):

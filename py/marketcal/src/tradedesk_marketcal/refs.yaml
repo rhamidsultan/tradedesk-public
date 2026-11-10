@@ -24,6 +24,10 @@ lot_sizes:
 # Charges for index options at Zerodha (percent values are percent: 0.15 = 0.15%).
 # Rows are applied by trade date: a trade before `until` uses the first row it falls under; `current` after.
 # Source: owner's Algo Lab config (checked against zerodha.com/charges, Oct 2026). Verify before relying on them.
+# Exchange freeze quantity (largest quantity in one order) per index, dated. Live entries are blocked for an index
+# with no entry here: fill it from the latest NSE / BSE circular before going live (owner to confirm the values).
+freeze_qty: {}
+
 charges_options:
   history:
     - {until: "2024-10-01", stt_sell_pct: 0.0625, exchange_txn_pct: 0.0495}

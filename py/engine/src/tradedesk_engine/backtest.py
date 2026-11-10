@@ -10,6 +10,15 @@ Fill model v0:
   * premium stops fill at the stop price, or at the bar open if it gapped through (overnight gaps too);
   * underlying (spot) stops and targets exit the option at the close of the bar in which spot hit the level;
   * exits use the last traded price (≤ 30 minutes old) when the option did not trade — counted as stale.
+Honest fills (costs.fill_model = "honest", after Algo Lab PR #57):
+  * every fill (entries, exits, stops) pays at least a minimum half-spread on cheap options
+    (costs.min_half_spread, per side), and slippage and spread are multiplied by costs.cost_stress;
+  * a fill never uses a trade older than costs.fill_max_age_min (3): an exit with no trade in its 3-minute
+    window and none that recent is booked at the last known price and counted (exit_stale_any_age);
+  * an entry with no trade in its 3-minute window is skipped (python strategies too: no stale entries);
+  * decisions (re-entry gap, lot sizing from risk) use the last trade before the decision minute, never the fill.
+  Unlike Algo Lab, orders do not wait 15 minutes for the next trade: a later fill would land after the
+  strategy's entry and exit cut-offs and let decisions see prices from the future (audit 3 Nov 2026).
 Charges: refs.yaml `charges_options`, by trade date. Lot size: refs.yaml by contract expiry.
 """
 from __future__ import annotations
@@ -127,12 +136,32 @@ class Backtest:
         self.margin_by_day: list[tuple[str, float]] = []
         self.stopped_out: dict[str, tuple[float, str]] = {}   # symbol -> (stop-out price, entry side), for reentry_gap
         self.no_entry_before = 0          # paper: a session started mid-day takes no entries before its start minute
+        # paper actions for the day being run, set by the caller each day (minute-stamped, so a replay repeats them):
+        self.no_entry_from: int | None = None    # paused / stopped: no new entries from this minute
+        self.no_entry_ranges: list = []          # paused between [from, to) minutes (pause, then resume)
+        self.manual_exit_at = None               # square off (a minute or a list): open legs exit at that minute's open
         from .pyrun import attach
         attach(self)                      # python strategies (spec kind "python")
 
     # ------------------------------------------------------------------ helpers
+    @property
+    def honest(self) -> bool:
+        return self.s.costs.fill_model == "honest"
+
+    def _age(self, classic: int) -> int:
+        """Oldest last trade a price may come from: the classic allowance, or the honest fill age."""
+        return self.s.costs.fill_max_age_min if self.honest else classic
+
+    def _wait(self, classic: int) -> int:
+        """How many minutes an order waits for the next trade (the same in both models, see the module notes)."""
+        return classic
+
     def _slip(self, price: float, side: str) -> float:
-        adj = max(TICK, price * self.s.costs.slippage_pct / 100)
+        cs = self.s.costs
+        adj = max(TICK, price * cs.slippage_pct / 100)
+        if self.honest:
+            half = next((h for below, h in sorted(cs.min_half_spread) if price < below), 0.0)
+            adj = max(adj, half) * cs.cost_stress
         p = price + adj if side == "BUY" else max(TICK, price - adj)
         return round(round(p / TICK) * TICK, 2)
 
@@ -168,7 +197,7 @@ class Backtest:
         exp = self._expiry_for(day, leg.expiry)
         if exp is None:
             return None
-        cands = [c for c in day.by_key.get((exp, leg.type), []) if c.s.last_before(m, max_age=30) >= 0]
+        cands = [c for c in day.by_key.get((exp, leg.type), []) if c.s.last_before(m, max_age=20 if self.honest else 30) >= 0]
         if not cands:
             return None
         if leg.strike.by == "atm_offset":
@@ -181,7 +210,8 @@ class Backtest:
         otm = [c for c in cands if (c.strike >= spot if leg.type == "CE" else c.strike <= spot)]
         if not otm:
             return None
-        def last(c): return c.s.c[c.s.last_before(m, 30)]
+        age = 20 if self.honest else 30
+        def last(c): return c.s.c[c.s.last_before(m, age)]
         return min(otm, key=lambda c: (abs(last(c) - leg.strike.value), abs(c.strike - spot)))
 
     def _stop_fill(self, p: Position, o, h, l, c, short) -> float | None:
@@ -261,7 +291,7 @@ class Backtest:
         i = c.s.at(m)
         if i >= 0 and c.s.good[i]:
             return float(c.s.c[i]), False
-        j = c.s.last_before(m + 1, max_age=30)
+        j = c.s.last_before(m + 1, max_age=self._age(30))
         return (float(c.s.c[j]), True) if j >= 0 else (None, True)
 
     # ------------------------------------------------------------------ run
@@ -269,7 +299,10 @@ class Backtest:
         """stop_at (time.time()): return None when time is up; call again with the same dates to continue."""
         import time as _t
         done = getattr(self, "_done_until", None)
-        for d in self.feed.dates(start, end):
+        data_days = self.feed.dates(start, end)
+        if data_days:
+            self.diag["first_data_day"], self.diag["last_data_day"] = str(data_days[0]), str(data_days[-1])
+        for d in data_days:
             if done and d <= done:
                 continue
             if stop_at and _t.time() > stop_at:
@@ -365,15 +398,33 @@ class Backtest:
             """Exits decided on bar m's prices (daily loss, position stop, spot stop) fill at the next traded minute's
             open; clock exits (time, expiry, lone leg) are known when minute m starts and fill at its open. Within 3
             minutes, else at the last trade, flagged stale. Never at the close of the bar that decided."""
-            j = p.c.s.first_from(m if timed else m + 1, within=3)
+            j = p.c.s.first_from(m if timed else m + 1, within=self._wait(3))
             if j >= 0:
                 return close_pos(p, int(p.c.s.m[j]), float(p.c.s.o[j]), reason)
             px, stale = self._price_now(p.c, m)
+            if px is None:
+                self.diag["exit_stale_any_age"] = self.diag.get("exit_stale_any_age", 0) + 1
             return close_pos(p, m, px if px is not None else p.last, reason, True)
+
+        ranges = [tuple(r) for r in (getattr(self, "no_entry_ranges", None) or [])]   # older saved sessions predate these
+        if getattr(self, "no_entry_from", None) is not None:
+            ranges.append((self.no_entry_from, 10 ** 6))
+        mx = getattr(self, "manual_exit_at", None)
+        manual_exits = set(mx) if isinstance(mx, (list, tuple, set)) else ({mx} if mx is not None else set())
+
+        def paused_at(x: int) -> bool:
+            return any(a <= x < b for a, b in ranges)
 
         for m in range(N_MIN if until is None else min(N_MIN, until)):
             si = spot.at(m)
-            # 1) pending entries fill at this minute
+            blocked = paused_at(m + 1)
+            # 0) square off asked by the trader: known when minute m starts, fills at its open
+            if m in manual_exits and self.positions:
+                for p in list(self.positions):
+                    exit_next(p, m, "manual", timed=True)
+            # 1) pending entries fill at this minute (none once paused)
+            if pending and paused_at(m):
+                pending = []
             if pending and m <= self.m_last_new + 1 and not locked:
                 for action in pending:
                     self._enter(day, m, action, last_spot)
@@ -433,8 +484,10 @@ class Backtest:
                     why = "expiry" if is_expiry_for(p) or p.c.expiry < d else "time_exit"
                     if p.c.expiry < d or m == N_MIN - 1:
                         px, stale = self._price_now(p.c, m)
+                        if px is None:
+                            self.diag["exit_stale_any_age"] = self.diag.get("exit_stale_any_age", 0) + 1
                         close_pos(p, m, px if px is not None else p.last, why, stale)
-                    elif p.c.s.first_from(m, within=3) >= 0 or self._price_now(p.c, m)[0] is not None:
+                    elif p.c.s.first_from(m, within=self._wait(3)) >= 0 or self._price_now(p.c, m)[0] is not None:
                         exit_next(p, m, why, timed=True)
             # 4) daily loss limit (realised today + open P&L since start of day)
             if self.positions or realised_today < 0:
@@ -458,7 +511,7 @@ class Backtest:
                     from .pyrun import PyCtx
                     pyctx = PyCtx(self, day, close_pos, self.py_logs)
                 if si >= 0 and m + 1 >= self.no_entry_before or self.positions:
-                    self.py_locked = locked or not (DAYS[d.weekday()] in self.s.schedule.days)
+                    self.py_locked = locked or blocked or not (DAYS[d.weekday()] in self.s.schedule.days)
                     pyctx.m = m
                     pts = ["close"]
                     if si >= 0:
@@ -488,7 +541,7 @@ class Backtest:
             if (m + 1) % self.k == 0 and tf_o is not None:
                 acts = self.signals.on_bar(Bar(d, m + 1, tf_o, tf_h, tf_l, tf_c))
                 tf_o = tf_h = tf_l = tf_c = None
-                can_open = (not locked and max(self.m_start, self.no_entry_before) <= m + 1 <= self.m_last_new and not self.positions
+                can_open = (not locked and not blocked and max(self.m_start, self.no_entry_before) <= m + 1 <= self.m_last_new and not self.positions
                             and trades_today < self.s.risk.max_trades_per_day
                             and sl_hits_today <= self.s.risk.reentry_after_sl
                             and DAYS[d.weekday()] in self.s.schedule.days
@@ -496,7 +549,7 @@ class Backtest:
                 if acts and can_open:
                     self.diag["signals"] += 1
                     pending = [acts[0]]
-            if (m + 1) in self.at_time and m + 1 >= self.no_entry_before and not self.positions and not locked and trades_today < self.s.risk.max_trades_per_day \
+            if (m + 1) in self.at_time and m + 1 >= self.no_entry_before and not self.positions and not locked and not blocked and trades_today < self.s.risk.max_trades_per_day \
                     and DAYS[d.weekday()] in self.s.schedule.days:
                 pending = [self.at_time[m + 1]]
         # end of day: mark open positions
@@ -515,8 +568,11 @@ class Backtest:
     def _py_open(self, day: DayData, m: int, c: Contract, side: str, lots: int, group: str, reason: str):
         """Python strategy opening order: fills at the next traded minute's open (same fill model as no-code)."""
         d = day.date
-        j = c.s.first_from(m + 1, within=3)
+        j = c.s.first_from(m + 1, within=self._wait(3))
         stale = False
+        if j < 0 and self.honest:                         # honest: no trade in the 3-minute window, no fill
+            self.diag["entry_skipped_no_price"] += 1
+            return None
         if j < 0:                                         # no trade in the next 3 minutes: last trade within 15 min,
             k = c.s.last_before(m + 1, max_age=15)        # flagged stale (Algo Lab strategies expect their order filled)
             if k < 0:
@@ -604,7 +660,7 @@ class Backtest:
             if c is None:
                 self.diag["entry_skipped_no_strike"] += 1
                 return
-            j = c.s.first_from(m, within=3)
+            j = c.s.first_from(m, within=self._wait(3))
             if j < 0:
                 self.diag["entry_skipped_no_price"] += 1
                 return
@@ -622,11 +678,19 @@ class Backtest:
             gap = self.s.risk.reentry_gap
             if gap and c.symbol in self.stopped_out:
                 out_px, side = self.stopped_out[c.symbol]
-                now_px = float(c.s.o[j])
+                k = c.s.last_before(m, max_age=self._age(30))       # honest: decide on what is known at m
+                if self.honest and k < 0:
+                    self.diag["entry_skipped_no_recent_price"] = self.diag.get("entry_skipped_no_recent_price", 0) + 1
+                    return
+                now_px = float(c.s.c[k]) if self.honest else float(c.s.o[j])
                 ok = now_px >= out_px + gap if side == "BUY" else now_px <= out_px - gap
                 if not ok:
                     self.diag["entry_skipped_reentry_gap"] = self.diag.get("entry_skipped_reentry_gap", 0) + 1
                     return
+            if self.honest and leg.lots == "from_risk" and c.s.last_before(m, max_age=self._age(30)) < 0:
+                # sizing from risk needs a price known at m; never size on the fill bar (skip the whole trade)
+                self.diag["entry_skipped_no_recent_price"] = self.diag.get("entry_skipped_no_recent_price", 0) + 1
+                return
             picks.append((i, leg, c, j, lot.value))
         r = self.s.risk
         self._tid += 1
@@ -641,7 +705,9 @@ class Backtest:
             fm = int(c.s.m[j])
             if leg.lots == "from_risk":
                 pts = r.stop_loss.value if r.stop_loss.on == "underlying" and r.stop_loss.type == "points" else None
-                per_lot = (pts * r.assumed_delta * lot) if pts else float(c.s.o[j]) * lot * (r.stop_loss.value / 100 if r.stop_loss.type == "percent" else 1)
+                k = c.s.last_before(m, max_age=self._age(30))
+                known = float(c.s.c[k]) if (self.honest and k >= 0) else float(c.s.o[j])
+                per_lot = (pts * r.assumed_delta * lot) if pts else known * lot * (r.stop_loss.value / 100 if r.stop_loss.type == "percent" else 1)
                 lots = max(1, min(r.max_lots, int(r.risk_per_trade // per_lot))) if per_lot > 0 else 1
             else:
                 lots = int(leg.lots)

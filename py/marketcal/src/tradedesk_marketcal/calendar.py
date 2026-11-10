@@ -34,6 +34,8 @@ class MarketCalendar:
         self.last_bar = time.fromisoformat(s.get("last_bar", "15:29"))
         self._lots = {u: sorted(((_d(e["from"]), e) for e in v), key=lambda p: p[0])
                       for u, v in raw.get("lot_sizes", {}).items()}
+        self._freeze = {u: sorted(((_d(e["from"]), e) for e in v), key=lambda p: p[0])
+                        for u, v in (raw.get("freeze_qty") or {}).items()}
         self._wd = {u: sorted(((_d(e["from"]), e) for e in v), key=lambda p: p[0])
                     for u, v in raw.get("expiry_weekday", {}).items()}
 
@@ -95,6 +97,10 @@ class MarketCalendar:
         if hit is None:
             return None
         return Ref(int(hit[field]), bool(hit.get("verified", False)), str(hit.get("source", "")))
+
+    def freeze_qty(self, underlying: str, d: date | str) -> Ref | None:
+        """Exchange freeze quantity (largest quantity in one order) for `underlying` on day `d`, or None if unknown."""
+        return self._lookup(self._freeze, underlying.upper(), _d(d), "qty")
 
     def lot_size(self, underlying: str, expiry: date | str) -> Ref | None:
         """Lot size for a contract of `underlying` expiring on `expiry`, or None if not covered."""

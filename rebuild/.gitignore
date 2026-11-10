@@ -1,0 +1,18 @@
+# never commit secrets or data
+*.db
+*.db-journal
+.env
+*.pem
+*.p8
+*.mobileprovision
+__pycache__/
+*.egg-info/
+.pytest_cache/
+# Xcode
+ios/*.xcodeproj/
+ios/build/
+ios/DerivedData/
+xcuserdata/
+Config/Local.xcconfig
+ios/TradeDesk/Resources/Info.plist
+ios/Widgets/Info.plist

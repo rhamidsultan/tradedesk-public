@@ -1,0 +1,29 @@
+name: rebuild iOS build
+on:
+  pull_request:
+    paths: ["rebuild/ios/**", ".github/workflows/rebuild-ios.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    # Needs Xcode 26 (iOS 26 SDK). Builds for the simulator without signing and runs the unit tests.
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: rebuild/ios
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select the newest Xcode 26
+        run: |
+          x=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$x" ]; then sudo xcode-select -s "$x"; fi
+          xcodebuild -version
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - name: Build and test (simulator, unsigned)
+        run: |
+          dest=$(xcrun simctl list devices available -j | python3 -c "import json,sys;d=json.load(sys.stdin)['devices'];print(next(x['udid'] for k,v in d.items() if 'iOS-26' in k for x in v if 'iPhone' in x['name']))")
+          xcodebuild test -project TradeDesk.xcodeproj -scheme TradeDesk \
+            -destination "id=$dest" CODE_SIGNING_ALLOWED=NO | tee build.log | grep -E "error:|warning: .*deprecated|Test Suite|Executed|BUILD|TEST" || true
+          grep -q "TEST SUCCEEDED" build.log

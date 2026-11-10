@@ -1,0 +1,7 @@
+[Unit]
+Description=TradeDesk rebuild: check GitHub main for merged code
+
+[Service]
+Type=oneshot
+User=tradedesk
+ExecStart=/opt/td2/app/rebuild/server/ops/check_update.sh

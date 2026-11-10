@@ -95,7 +95,8 @@ class OrderManager:
     def __init__(self, broker: Broker, db: Path | str, limits: Limits,
                  alert: Callable[[str, str, str], None] | None = None, clock: Callable[[], float] | None = None,
                  sleep: Callable[[float], None] | None = None,
-                 preflight: Callable[[list], list[str]] | None = None, log: Callable[[str], None] | None = None):
+                 preflight: Callable[[list], list[str]] | None = None, log: Callable[[str], None] | None = None,
+                 market_open: Callable[[], bool] | None = None):
         if limits is None or not isinstance(limits, Limits):
             raise ValueError("explicit Limits are required")
         self.b = broker
@@ -103,6 +104,9 @@ class OrderManager:
         self.alert_fn = alert or (lambda *a: None)
         self.log = log or (lambda s: None)
         self.preflight = preflight          # runner: feed fresh, margin, circuit limits → list of reasons to block
+        # runner: is the F&O market open now (trading day and session)? Closed: no exit orders are sent and a
+        # stop that Zerodha expired at the close is not treated as missing; both resume at the next open.
+        self.market_open = market_open or (lambda: True)
         self.clock = clock or _time.time
         self.sleep = sleep or _time.sleep
         self.db = sqlite3.connect(str(db), isolation_level=None)
@@ -117,6 +121,7 @@ class OrderManager:
         self._sent: list[float] = []
         self._book: dict[str, OrderState] = {}
         self._loss_done_day = None
+        self._cancel_alerted: set[str] = set()
 
     # ------------------------------------------------------------------ basics
     def now_ist(self) -> datetime:
@@ -172,9 +177,9 @@ class OrderManager:
                 raise
         raise RateLimited("rate limited 5 times")
 
-    def _send(self, kind: str, session: str, leg: int, fields: dict) -> str:
+    def _send(self, kind: str, session: str, leg: int, fields: dict, tag: str | None = None) -> str:
         """Write the intent (SENDING) before the HTTP call; then SENT / FAILED. Returns the tag."""
-        tag = self._tag()
+        tag = tag or self._tag()
         req = OrderReq(tag=tag, **fields)
         now = self.clock()
         self.db.execute("INSERT INTO intents(tag, day, session, leg, kind, symbol, exchange, side, qty, order_type, price, trig, status, created, updated)"
@@ -269,10 +274,13 @@ class OrderManager:
         if self.db.execute("SELECT 1 FROM intents WHERE status='SENDING'").fetchone():
             self.event("important", "waiting to match orders sent before the restart; trading stays off until then")
             return False
+        if not self.market_open():
+            return False                                # stops can only be placed while the market is open
         for lg in self._legs("status='open'"):
             if self._open_qty(lg) > 0 and lg["sl_trigger"] is not None and not self._working(lg["sl_tag"]):
                 self.event("important", f"{lg['symbol']} carried without a working SL; placing a fresh one")
-                self._place_sl(lg, self._open_qty(lg))
+                if not self._place_sl(lg, self._open_qty(lg), retry_on_reject=True):
+                    return False
         ok = self.reconcile()
         self.ready = ok
         return ok
@@ -388,14 +396,18 @@ class OrderManager:
         if not nxt:
             return
         lg = nxt[0]
+        # the leg is 'entering' with its tag BEFORE the request goes out: a crash or Ctrl-C mid-request leaves a leg
+        # that poll() matches by tag (a late fill is adopted and protected), never a pending leg with an unknown order
+        tag = self._tag()
+        self._set_leg(lg["id"], status="entering", entry_tag=tag, entry_sent=self.clock())
         try:
-            tag = self._send("entry", session, lg["id"], dict(symbol=lg["symbol"], exchange=lg["exchange"], side=lg["side"],
-                                                             qty=lg["qty"], order_type="LIMIT", price=lg["price"], product=lg["product"]))
+            self._send("entry", session, lg["id"], dict(symbol=lg["symbol"], exchange=lg["exchange"], side=lg["side"],
+                                                       qty=lg["qty"], order_type="LIMIT", price=lg["price"], product=lg["product"]),
+                       tag=tag)
         except BrokerError as e:
             self._set_leg(lg["id"], status="failed", reason=f"entry rejected: {e}")
             self._abort(session, f"entry leg {lg['symbol']} rejected: {e}")
             return
-        self._set_leg(lg["id"], status="entering", entry_tag=tag, entry_sent=self.clock())
 
     def _abort(self, session: str, why: str):
         """Reject / timeout / partial on entry: drop pending legs, square off what filled, lock the session."""
@@ -405,9 +417,11 @@ class OrderManager:
         self._exit_all(f"session={session!r}", "entry_abort")
 
     # ------------------------------------------------------------------ protective stop and exits
-    def _place_sl(self, lg, qty: int):
+    def _place_sl(self, lg, qty: int, retry_on_reject: bool = False) -> bool:
+        """retry_on_reject (carried legs at start()): a refused stop leaves the leg open and start() not ready, so it
+        is retried; the leg is exited only when the price has already gapped through the stop."""
         if qty <= 0 or lg["sl_trigger"] is None:          # long hedge: no stop by design
-            return
+            return True
         cs = self._close_side(lg["side"])
         trig = lg["sl_trigger"]
         try:
@@ -416,10 +430,25 @@ class OrderManager:
                                                                  product=lg["product"]))
             self._set_leg(lg["id"], sl_tag=tag)
             self.event("info", f"protective SL at broker for {lg['symbol']} × {qty}: trigger {trig}")
+            return True
         except BrokerError as e:
+            if retry_on_reject and not self._through_stop(lg):
+                self.event("critical", f"fresh SL for carried {lg['symbol']} refused ({e}); keeping the leg and retrying")
+                return False
             self.event("critical", f"protective SL for {lg['symbol']} rejected ({e}); exiting the leg now")
             self._set_leg(lg["id"], status="exiting", reason="sl_rejected", exit_started=self.clock(), exit_tag=None)
             self._try_exit(lg["id"])
+            return True
+
+    def _through_stop(self, lg) -> bool:
+        """Has the price already gone through this leg's stop? Unknown counts as no (keep the leg, retry)."""
+        try:
+            q = self._call(self.b.quote, [lg["symbol"]], lg["exchange"]).get(lg["symbol"])
+        except BrokerError:
+            return False
+        if q is None or not q.ltp:
+            return False
+        return q.ltp >= lg["sl_trigger"] if lg["side"] == "SELL" else q.ltp <= lg["sl_trigger"]
 
     def _protect_partial(self, lg, filled: int):
         """SL always sized to what has filled so far."""
@@ -473,10 +502,18 @@ class OrderManager:
     def _try_exit(self, leg_id: int):
         """One attempt to get a closing LIMIT working for the open quantity. Safe to call repeatedly."""
         lg = self._leg(leg_id)
+        if not self.market_open():
+            return                                               # market closed: the exit is sent at the next open
         if self._is_hedge(lg) and lg["status"] == "exiting" and self._shorts_open(lg["session"]):
             return                                               # wing waits until its shorts are bought back
         cs = self._close_side(lg["side"])
         ent = self._intent(lg["entry_tag"])
+        if ent and ent["status"] == "SENDING":
+            # the entry request's reply was lost (or interrupted): match it by tag before deciding anything
+            self._sync(self._call(self.b.orders))
+            ent = self._intent(lg["entry_tag"])
+            if ent and ent["status"] == "SENDING":
+                return                  # keep 'exiting'; poll retries; failed only once resolved as not at the broker
         eo = self._working(lg["entry_tag"])
         if eo:                                                       # cancel the rest of an unfilled entry first
             try:
@@ -596,6 +633,8 @@ class OrderManager:
             return False
 
     def _chase(self, lg, tag: str, aggressive: bool):
+        if not self.market_open():
+            return
         o = self._working(tag)
         if not o:
             return
@@ -635,9 +674,21 @@ class OrderManager:
         self._resolve_sending()
         now = self.clock()
         changed = False
-        # late-appearing entries on legs already given up: protect and close
+        # late-appearing entries on legs already given up: cancel what is still working, protect and close fills
         for lg in self._legs("status='failed' AND entry_tag IS NOT NULL"):
             ent = self._intent(lg["entry_tag"])
+            # today's legs only, against the book just synced (no extra broker call per leg)
+            o = self._book.get(ent["order_id"]) if (lg["day"] == self.day() and ent and ent["order_id"]) else None
+            if o is not None and o.status not in TERMINAL:
+                first = lg["entry_tag"] not in self._cancel_alerted
+                self._cancel_alerted.add(lg["entry_tag"])
+                if first:
+                    self.event("important", f"{lg['symbol']}: entry order of a given-up leg still working; cancelling")
+                try:
+                    self._call(self.b.cancel, o.order_id)
+                except BrokerError as e:
+                    if first:
+                        self.event("critical", f"could not cancel late entry {lg['entry_tag']}: {e}")
             if ent and ent["filled"] > self._closed_qty(lg["id"]):
                 self._set_leg(lg["id"], status="open", filled=ent["filled"], entry_avg=ent["avg"])
                 self._protect_partial(self._leg(lg["id"]), ent["filled"])
@@ -683,6 +734,11 @@ class OrderManager:
         if lg["status"] == "entering":
             ent = self._intent(lg["entry_tag"])
             if not ent:
+                # marked before the request, but no intent row: the process stopped before anything was sent
+                if now - (lg["entry_sent"] or now) > self.L.resolve_after:
+                    self._set_leg(lg["id"], status="failed", reason="entry never sent (stopped before the request)")
+                    self._abort(lg["session"], f"entry {lg['symbol']} never sent")
+                    return True
                 return False
             st, filled = ent["bstatus"], ent["filled"]
             if filled > 0:
@@ -721,6 +777,10 @@ class OrderManager:
             sl_it = self._intent(lg["sl_tag"])
             sl = self._working(lg["sl_tag"])
             if sl is None:
+                if not self.market_open():
+                    return False        # after the close / holidays: Zerodha expired the DAY stop; start() re-places it
+                if sl_it and sl_it["day"] != self.day() and not self.ready:
+                    return False        # carried overnight: its DAY stop expired; start() re-places it after the open
                 if not sl_it or sl_it["status"] != "SENDING":
                     self.event("critical", f"{lg['symbol']} has no working SL at the broker; exiting")
                     self.exit_leg(lg["id"], "sl_missing")
