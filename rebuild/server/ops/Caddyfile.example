@@ -1,0 +1,6 @@
+# Add a site block next to the existing ones. sslip.io gives a name for the server's IP with HTTPS.
+td2.<your-ip-with-dashes>.sslip.io {
+    reverse_proxy 127.0.0.1:8720
+    header Strict-Transport-Security "max-age=31536000"
+    # no `log` directive on purpose: sign-in links and Kite request tokens travel in URLs
+}

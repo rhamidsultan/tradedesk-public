@@ -1,0 +1,6 @@
+[Unit]
+Description=TradeDesk rebuild: install merged code from GitHub main, roll back if unhealthy
+
+[Service]
+Type=oneshot
+ExecStart=/opt/td2/app/rebuild/server/ops/self_update.sh

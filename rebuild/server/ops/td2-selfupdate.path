@@ -1,0 +1,8 @@
+[Unit]
+Description=Run Update now when the app asks for it
+
+[Path]
+PathExists=/opt/td2/data/update-request
+
+[Install]
+WantedBy=multi-user.target

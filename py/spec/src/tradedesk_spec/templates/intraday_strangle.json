@@ -1,0 +1,37 @@
+{
+  "id": "intraday_strangle",
+  "name": "Intraday strangle with leg stops, re-entry and day filters",
+  "version": 1,
+  "kind": "python",
+  "module": "intraday_strangle",
+  "instrument": {
+    "underlying": "NIFTY",
+    "timeframe": "1m"
+  },
+  "schedule": {
+    "days": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri"
+    ],
+    "start": "09:16",
+    "no_new_after": "15:00",
+    "exit_by": "15:15",
+    "hold_overnight": false,
+    "expiry_exit_time": "15:15"
+  },
+  "risk": {
+    "stop_loss": {
+      "on": "premium",
+      "type": "multiple",
+      "value": 2
+    },
+    "max_lots": 2,
+    "max_loss_per_day": 8000,
+    "max_trades_per_day": 4
+  },
+  "params": {},
+  "notes": "Algo Lab intraday_strangle: sells an out-of-the-money call and put with a stop on each leg, may re-enter after a stop, skips filtered days, and closes by the exit time."
+}

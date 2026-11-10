@@ -1,0 +1,70 @@
+# Dated Indian-market calendar for the rebuild server. Never hard-code these in code (CLAUDE.md).
+# Copied from py/marketcal refs.yaml on 3 Nov 2026; each year's NSE holiday circular must be added
+# before that year starts (the server raises an alert when the list for next year is missing by 1 Dec).
+# Times are IST. A row in `sessions` applies from its date until the next row.
+
+timezone: Asia/Kolkata
+# Kite access tokens expire at 06:00 IST the next day; a login after 06:00 is for that day.
+kite_day_starts: "06:00"
+
+sessions:
+  - {from: "2000-01-01", pre_open: "09:00", open: "09:15", cash_close: "15:30", fo_close: "15:30",
+     source: "NSE"}
+  - {from: "2026-08-03", pre_open: "09:00", open: "09:15", cash_close: "15:35", fo_close: "15:40",
+     closing_auction: "15:15-15:35", source: "NSE/SEBI closing auction; F&O until 15:40 (Algo Lab notes)",
+     verified: true}
+
+holidays:
+  - "2024-01-22"
+  - "2024-01-26"
+  - "2024-03-08"
+  - "2024-03-25"
+  - "2024-03-29"
+  - "2024-04-11"
+  - "2024-04-17"
+  - "2024-05-01"
+  - "2024-05-20"
+  - "2024-06-17"
+  - "2024-07-17"
+  - "2024-08-15"
+  - "2024-10-02"
+  - "2024-11-01"   # Diwali (Muhurat session only)
+  - "2024-11-15"
+  - "2024-11-20"
+  - "2024-12-25"
+  - "2025-02-26"
+  - "2025-03-14"
+  - "2025-03-31"
+  - "2025-04-10"
+  - "2025-04-14"
+  - "2025-04-18"
+  - "2025-05-01"
+  - "2025-08-15"
+  - "2025-08-27"
+  - "2025-10-02"
+  - "2025-10-21"   # Diwali (Muhurat session only)
+  - "2025-10-22"
+  - "2025-11-05"
+  - "2025-12-25"
+  - "2026-01-15"
+  - "2026-01-26"
+  - "2026-03-03"
+  - "2026-03-26"
+  - "2026-03-31"
+  - "2026-04-03"
+  - "2026-04-14"
+  - "2026-05-01"
+  - "2026-05-28"
+  - "2026-06-26"
+  - "2026-09-14"
+  - "2026-10-02"
+  - "2026-10-20"
+  - "2026-11-10"
+  - "2026-11-24"
+  - "2026-12-25"
+
+# Weekend dates with a full or special trading session (e.g. Budget day).
+extra_sessions:
+  - "2024-01-20"
+  - "2025-02-01"   # Budget (Saturday)
+  - "2026-02-01"   # Budget (Sunday), seen in TrueData

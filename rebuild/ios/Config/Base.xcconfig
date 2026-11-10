@@ -1,0 +1,6 @@
+// Shared settings. Your own Apple team and a unique bundle id go in Local.xcconfig (not committed):
+//   TD_TEAM_ID = ABCDE12345            (Xcode › Settings › Accounts › your Personal Team)
+//   TD_BUNDLE_ID = com.yourname.tradedesk
+TD_BUNDLE_ID = app.tradedesk.dev
+TD_TEAM_ID =
+#include? "Local.xcconfig"

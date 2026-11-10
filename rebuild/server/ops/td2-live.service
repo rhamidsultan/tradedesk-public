@@ -1,0 +1,21 @@
+[Unit]
+Description=TradeDesk rebuild live runner (the only process that can send real orders: shadow and live desks)
+After=network-online.target td2-api.service
+
+[Service]
+User=tradedesk
+WorkingDirectory=/opt/td2/app/rebuild/server
+EnvironmentFile=/opt/td2/secrets/td2.env
+ExecStart=/opt/td2/venv/bin/python -m tdserver.live
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+# reads the store; writes desk state (oms.db, shadow books) under the runs folder
+ReadWritePaths=/opt/td2/data /opt/td2/store
+PrivateTmp=true
+MemoryMax=500M
+
+[Install]
+WantedBy=multi-user.target

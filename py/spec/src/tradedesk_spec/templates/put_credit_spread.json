@@ -1,0 +1,37 @@
+{
+  "id": "put_credit_spread",
+  "name": "Put-skew credit spread (bull put spread, trend filter)",
+  "version": 1,
+  "kind": "python",
+  "module": "put_credit_spread",
+  "instrument": {
+    "underlying": "NIFTY",
+    "timeframe": "1m"
+  },
+  "schedule": {
+    "days": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri"
+    ],
+    "start": "09:16",
+    "no_new_after": "15:00",
+    "exit_by": "15:29",
+    "hold_overnight": true,
+    "expiry_exit_time": "15:15"
+  },
+  "risk": {
+    "stop_loss": {
+      "on": "premium",
+      "type": "multiple",
+      "value": 3
+    },
+    "max_lots": 2,
+    "max_loss_per_day": 8000,
+    "max_trades_per_day": 2
+  },
+  "params": {},
+  "notes": "Algo Lab put_credit_spread: sells an out-of-the-money put and buys a lower put (defined risk) when the trend filter allows; positional. The short put has a 3x backstop at Kite."
+}

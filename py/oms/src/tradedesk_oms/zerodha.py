@@ -5,6 +5,7 @@ Errors map to the taxonomy in broker.py; a POST whose reply is lost raises Netwo
 """
 from __future__ import annotations
 
+import http.client
 import json
 import socket
 import urllib.error
@@ -39,7 +40,23 @@ class ZerodhaAdapter:
                                    headers={"X-Kite-Version": "3", "Authorization": self._auth})
         try:
             with urllib.request.urlopen(r, timeout=self.timeout) as resp:
-                return json.loads(resp.read())["data"]
+                raw = resp.read()
+        except urllib.error.HTTPError as e:
+            raw = None
+            err = e
+        except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError, http.client.HTTPException, OSError) as e:
+            if method != "GET":
+                raise NetworkUnknown(type(e).__name__)      # the order may have reached Zerodha: resolve by tag
+            raise BrokerDown(type(e).__name__)
+        if raw is not None:
+            try:
+                return json.loads(raw)["data"]
+            except (ValueError, KeyError, TypeError) as e:
+                if method != "GET":
+                    raise NetworkUnknown(f"unreadable reply ({type(e).__name__})")
+                raise BrokerDown(f"unreadable reply ({type(e).__name__})")
+        try:
+            raise err
         except urllib.error.HTTPError as e:
             try:
                 body = json.loads(e.read())
@@ -59,10 +76,6 @@ class ZerodhaAdapter:
             if method != "GET" and e.code >= 500:
                 raise NetworkUnknown(msg)
             raise BrokerDown(msg)
-        except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError) as e:
-            if method != "GET":
-                raise NetworkUnknown(type(e).__name__)
-            raise BrokerDown(type(e).__name__)
 
     def place(self, req: OrderReq) -> str:
         d = self._req("POST", "/orders/regular", {

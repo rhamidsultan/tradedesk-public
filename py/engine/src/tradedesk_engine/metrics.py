@@ -64,6 +64,7 @@ def summarise(result, capital: float) -> dict:
                                       if result.diagnostics.get("peak_margin") else None),
         "net_without_worst_day": round(sum(t.net for t in trades) - (min(p for _, p in result.daily) if result.daily else 0), 2),
         **_more(result, closed, capital, charges, max_dd),
+        **_figures(result, closed, capital),
     }
 
 
@@ -125,6 +126,54 @@ def _more(result, closed, capital, charges, max_dd) -> dict:
         "score_steady": (round((net / max_dd) * (sum(1 for x in months if x > 0) / len(months)), 3)
                          if max_dd and months else None),
     }
+
+
+def _figures(result, closed, capital) -> dict:
+    """More figures (Algo Lab "more figures"): profit factor, return a year, worst week, time in a trade."""
+    from datetime import date as _d, datetime as _dt
+    from tradedesk_marketcal import load_refs
+    nets = [t.net for t in closed]
+    won, lost = sum(x for x in nets if x > 0), -sum(x for x in nets if x < 0)
+    # every trading day between the first and last day with data counts (days the strategy skipped by its
+    # schedule have no daily row, and dates asked for beyond the stored data must not dilute the figure)
+    dg = result.diagnostics
+    a, b = dg.get("first_data_day"), dg.get("last_data_day")
+    n_days = len(load_refs().trading_days(a, b)) if a and b else 0
+    net = sum(t.net for t in result.trades)
+    weeks: dict[str, float] = defaultdict(float)
+    for d, p in result.daily:
+        y, w, _ = _d.fromisoformat(d).isocalendar()
+        weeks[f"{y}-W{w:02d}"] += p
+    held = []
+    for t in closed:
+        try:
+            a, b = _dt.fromisoformat(t.entry_ts), _dt.fromisoformat(t.exit_ts)
+            held.append((b - a).total_seconds() / 86400)
+        except (TypeError, ValueError):
+            pass
+    worst_week = min(weeks.items(), key=lambda kv: kv[1]) if weeks else None
+    best_week = max(weeks.items(), key=lambda kv: kv[1]) if weeks else None
+    return {
+        "profit_factor": round(won / lost, 2) if lost else None,
+        "profit_factor_note": "no losing trades" if nets and not lost else ("no trades" if not nets else ""),
+        "return_per_year_pct": round(net / capital * 100 / (n_days / 250), 2) if n_days else None,
+        "worst_week": {"week": worst_week[0], "pnl": round(worst_week[1], 0)} if worst_week else None,
+        "best_week": {"week": best_week[0], "pnl": round(best_week[1], 0)} if best_week else None,
+        "avg_days_in_trade": round(sum(held) / len(held), 2) if held else None,
+        "max_days_in_trade": round(max(held), 2) if held else None,
+        "luck_warning": (len(nets) < 30) or bool(nets and sum(nets) > 0 and
+                                                 sum(sorted(nets, reverse=True)[:5]) > sum(nets)),
+    }
+
+
+def curves(result, capital: float) -> dict:
+    """Equity and drawdown by day, and the P&L calendar by close day (for the results charts)."""
+    eq, peak, out = capital, capital, []
+    for d, p in result.daily:
+        eq += p
+        peak = max(peak, eq)
+        out.append({"date": d, "pnl": round(p, 2), "equity": round(eq, 2), "drawdown": round(eq - peak, 2)})
+    return {"days": out}
 
 
 GAP_PCT = 1.5
