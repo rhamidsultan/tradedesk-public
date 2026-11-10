@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TradeDesk — Incident</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.dark{--bg:#0E1014;--sf:#161A21;--sf2:#1D222B;--bd:#2A303B;--tx:#E8EAEE;--mu:#A0A8B6;--ac:#5B9BFF;--up:#34C77B;--dn:#FF6B6B;--live:#F5A524;--onac:#0E1014;--onlive:#0E1014;--paper:#8FA3C0;--onpaper:#0E1014;--itm:rgba(91,155,255,0.10);--scrim:rgba(0,0,0,0.6)}
+.light{--bg:#F6F7F9;--sf:#FFFFFF;--sf2:#F0F2F5;--bd:#E2E5EA;--tx:#16191F;--mu:#5B6472;--ac:#2A63C7;--up:#0B7A45;--dn:#C42F2F;--live:#9A5B00;--onac:#FFFFFF;--onlive:#FFFFFF;--paper:#4F6B8F;--onpaper:#FFFFFF;--itm:rgba(42,99,199,0.08);--scrim:rgba(16,20,28,0.45)}
+.n{font-variant-numeric:tabular-nums}
+a{color:var(--ac)}a:hover{color:var(--tx)}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--bg); color: var(--tx); font-family: Inter, system-ui, sans-serif; font-size: 14px">
+
+<div style="background: var(--live); color: var(--onlive); font-size: 12px; font-weight: 700; padding: 7px 16px; display: flex; justify-content: space-between"><span>● LIVE · Kite [client ID] · strangle</span><span class="n">{{time}}</span></div>
+
+<main style="flex: 1; overflow-y: auto; padding: 18px 16px 16px; display: flex; flex-direction: column; gap: 14px">
+<section role="alert" style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; font-weight: 700; letter-spacing: 0.5px; color: {{sevC}}">{{sev}}</span>
+<h1 style="margin: 0; font-size: 21px; line-height: 1.25">{{title}}</h1>
+<div class="n" style="font-size: 14px; color: var(--mu); line-height: 1.5">{{what}}</div>
+</section>
+
+<section style="background: var(--sf); border: 1px solid var(--bd); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px">
+<div style="font-weight: 600">What TradeDesk did</div>
+<sc-for list="{{did}}" as="d" hint-placeholder-count="3">
+<div class="n" style="display: flex; gap: 10px; font-size: 13px"><span style="color: {{d.c}}; width: 14px; font-weight: 700">{{d.i}}</span><span>{{d.t}}</span></div>
+</sc-for>
+</section>
+
+<section class="n" style="display: flex; flex-direction: column; gap: 4px; background: var(--sf2); border-radius: 12px; padding: 12px 14px">
+<div style="display: flex; justify-content: space-between; align-items: baseline"><span style="color: var(--mu); font-size: 13px">{{riskLabel}}</span><span style="font-size: 20px; font-weight: 700; color: {{riskC}}">{{risk}}</span></div>
+<span style="font-size: 12px; color: var(--mu)">{{riskSub}}</span>
+</section>
+
+<div style="font-size: 12px; color: var(--mu)">Sent to you: push · WhatsApp · SMS · email</div>
+</main>
+
+<footer style="border-top: 1px solid var(--bd); background: var(--sf); padding: 12px 16px 26px; display: flex; flex-direction: column; gap: 10px">
+<sc-if value="{{slide}}" hint-placeholder-val="{{ true }}">
+<div role="slider" aria-label="{{primary}}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0" style="height: 54px; border-radius: 27px; background: var(--sf2); border: 1.5px solid var(--live); display: flex; align-items: center; padding: 4px; box-sizing: border-box">
+<div style="width: 46px; height: 46px; border-radius: 23px; background: var(--live); display: flex; align-items: center; justify-content: center; color: var(--onlive)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></div>
+<span style="flex: 1; text-align: center; font-weight: 600; font-size: 14px">{{primary}}</span>
+</div>
+</sc-if>
+<sc-if value="{{button}}" hint-placeholder-val="{{ false }}">
+<a href="Session.dc.html" style="height: 50px; border-radius: 12px; background: var(--ac); color: var(--onac); text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700">{{primary}}</a>
+</sc-if>
+<a href="{{secondaryHref}}" style="height: 44px; border-radius: 12px; border: 1px solid var(--bd); color: var(--tx); text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 600">{{secondary}}</a>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"incident":{"editor":"enum","options":["Order rejected","SL not filled","Positions mismatch","Daily loss limit hit"],"default":"SL not filled"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const k = this.props.incident ?? 'SL not filled';
+    const ok = 'var(--up)', mu = 'var(--tx)', bad = 'var(--dn)';
+    const v = {
+      'Order rejected': { time: '09:20:04', sev: '⚠ ORDER REJECTED · NOTHING OPEN', sevC: mu,
+        title: 'Kite rejected SELL 26300 CE · qty 130 (2 lots)',
+        what: 'Insufficient margin: needs ₹2.55 L, free ₹2.10 L (MTM on other positions used some). The PE leg was not sent, so there is no one-sided position.',
+        did: [{ i: '✓', c: ok, t: 'Stopped before the second leg' }, { i: '✓', c: ok, t: 'Paused this strategy for today' }, { i: '✓', c: ok, t: 'Checked Kite: nothing open for this strategy' }],
+        riskLabel: 'Open risk now', risk: '₹0', riskC: ok, riskSub: '1 lot would fit: worst case −₹3,439 if the app is down',
+        slide: false, button: true, primary: 'Keep paused', secondary: 'Retry with 1 lot…', secondaryHref: 'StrangleRisk.dc.html' },
+      'SL not filled': { time: '11:52:18', sev: '✕ DAILY LIMIT PASSED · EXITING BOTH LEGS', sevC: bad,
+        title: 'CE stop triggered but has not filled',
+        what: 'Trigger 127.50 hit at 11:51:40. Limit 140.25 is below the market: LTP 146.80, ask 147.10. Still short 26300 CE qty 130 (2 lots).',
+        did: [{ i: '✓', c: ok, t: 'Raised the limit every 5 s (3 of 6 tries)' }, { i: '✓', c: ok, t: 'Started exiting the PE leg (in profit) at ask' }, { i: '…', c: mu, t: 'After try 6 (11:52:45): exit at ask + 2%, keep trying' }],
+        riskLabel: 'CE loss at ask 147.10', risk: '▼ −₹13,598', riskC: bad, riskSub: 'Strategy ≤ −₹8,554 even with full PE profit · each ₹1 rise = −₹130',
+        slide: true, button: false, primary: 'Slide to exit both LIVE legs now', secondary: 'Let auto-exit continue', secondaryHref: 'Session.dc.html' },
+      'Positions mismatch': { time: '09:16:02', sev: '⚠ STOPPED · SL RESIZED', sevC: mu,
+        title: 'Kite has 1 lot of the PE, the strategy expects 2',
+        what: 'Kite: 25350 PE qty −65 (1 lot). Strategy: −130 (2 lots). CE leg matches (−130). A manual trade in the Kite app is the usual cause.',
+        did: [{ i: '✓', c: ok, t: 'Resized PE SL order 130 → 65 so it cannot leave you long' }, { i: '✓', c: ok, t: 'CE SL order unchanged (qty 130 matches)' }, { i: '✓', c: ok, t: 'Stopped the strategy; no new orders sent' }],
+        riskLabel: 'If the app is down now', risk: '▼ −₹18,509', riskC: bad, riskSub: 'Both SLs at their limits, PE at 1 lot',
+        slide: true, button: false, primary: 'Slide to resume with PE at 1 lot', secondary: 'Open Kite positions', secondaryHref: 'Positions.dc.html' },
+      'Daily loss limit hit': { time: '13:42:09', sev: '✕ LOCKED UNTIL MON 26 OCT 09:15', sevC: bad,
+        title: 'Daily loss limit reached: −₹8,012',
+        what: 'Your limit is ₹8,000 (4%). All LIVE positions were closed at 13:42. LIVE strategies stay stopped until the next trading day, Mon 26 Oct.',
+        did: [{ i: '✓', c: ok, t: 'Changed both SL orders into exit orders (no double orders)' }, { i: '✓', c: ok, t: 'Both legs filled 13:42:15' }, { i: '✓', c: ok, t: 'Kite check: nothing open ✓ · paper keeps running' }],
+        riskLabel: 'Realised today, net', risk: '▼ −₹8,012', riskC: bad, riskSub: 'Open risk now: ₹0',
+        slide: false, button: true, primary: 'Review today\'s trades', secondary: 'Write a journal note', secondaryHref: 'Main.dc.html' }
+    }[k];
+    return { theme: this.props.theme ?? 'dark', ...v };
+  }
+}
+</script>
+</body>
+</html>

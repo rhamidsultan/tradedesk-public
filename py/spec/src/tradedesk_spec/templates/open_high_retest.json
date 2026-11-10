@@ -1,0 +1,35 @@
+{
+  "id": "open_high_retest",
+  "name": "Open-high retest: buy back toward the open (from 13:00)",
+  "version": 1,
+  "kind": "python",
+  "module": "open_high_retest",
+  "instrument": {
+    "underlying": "NIFTY",
+    "timeframe": "1m"
+  },
+  "schedule": {
+    "days": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri"
+    ],
+    "start": "13:00",
+    "no_new_after": "15:00",
+    "exit_by": "15:15"
+  },
+  "risk": {
+    "stop_loss": {
+      "on": "premium",
+      "type": "points",
+      "value": 15
+    },
+    "max_lots": 2,
+    "max_loss_per_day": 8000,
+    "max_trades_per_day": 4
+  },
+  "params": {},
+  "notes": "Algo Lab open_high_retest (your rules of 21 Oct): options whose open is still the day's high, bought within 15 points of the open; stop 10, target the open, stop tightens near the target. Broker backstop 15 points."
+}

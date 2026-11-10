@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TradeDesk — Stop all</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.dark{--bg:#0E1014;--sf:#161A21;--sf2:#1D222B;--bd:#2A303B;--tx:#E8EAEE;--mu:#A0A8B6;--ac:#5B9BFF;--up:#34C77B;--dn:#FF6B6B;--live:#F5A524;--onac:#0E1014;--onlive:#0E1014;--paper:#8FA3C0;--onpaper:#0E1014;--itm:rgba(91,155,255,0.10);--scrim:rgba(0,0,0,0.6)}
+.light{--bg:#F6F7F9;--sf:#FFFFFF;--sf2:#F0F2F5;--bd:#E2E5EA;--tx:#16191F;--mu:#5B6472;--ac:#2A63C7;--up:#0B7A45;--dn:#C42F2F;--live:#9A5B00;--onac:#FFFFFF;--onlive:#FFFFFF;--paper:#4F6B8F;--onpaper:#FFFFFF;--itm:rgba(42,99,199,0.08);--scrim:rgba(16,20,28,0.45)}
+.n{font-variant-numeric:tabular-nums}
+a{color:var(--ac)}a:hover{color:var(--tx)}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-end; background: var(--scrim); color: var(--tx); font-family: Inter, system-ui, sans-serif; font-size: 14px">
+<a href="Main.dc.html" aria-label="Cancel" style="flex: 1"></a>
+<section role="dialog" aria-label="Stop all strategies" style="background: var(--sf); border-radius: 20px 20px 0 0; border-top: 6px solid var(--dn); padding: 10px 16px 28px; display: flex; flex-direction: column; gap: 14px">
+<div style="width: 40px; height: 5px; border-radius: 3px; background: var(--bd); align-self: center"></div>
+<div style="font-size: 18px; font-weight: 700">Stop all and square off?</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px">
+<div style="display: flex; gap: 10px"><span style="font-size: 11px; font-weight: 700; color: var(--onlive); background: var(--live); border-radius: 4px; padding: 2px 6px; height: fit-content">LIVE</span><div style="display: flex; flex-direction: column; gap: 3px"><span style="font-weight: 600">Square off 2 legs at Kite</span><span class="n" style="color: var(--mu)">BUY 26300 CE 130 · BUY 25350 PE 130 · LIMIT at ask, re-price ≤ 30 s</span></div></div>
+<div style="display: flex; gap: 10px"><span style="font-size: 11px; font-weight: 700; color: var(--onlive); background: var(--live); border-radius: 4px; padding: 2px 6px; height: fit-content">LIVE</span><div style="display: flex; flex-direction: column; gap: 3px"><span style="font-weight: 600">Cancel 2 SL orders after the fills</span><span class="n" style="color: var(--mu)">trg 127.50 and 116.40</span></div></div>
+<div style="display: flex; gap: 10px"><span style="font-size: 11px; font-weight: 700; color: var(--onpaper); background: var(--paper); border-radius: 4px; padding: 2px 6px; height: fit-content">PAPER</span><div style="display: flex; flex-direction: column; gap: 3px"><span style="font-weight: 600">Close 1 paper position, stop 2 paper strategies</span><span style="color: var(--mu)">ORB breakout · Supertrend intraday</span></div></div>
+<div style="display: flex; gap: 10px"><span style="font-size: 11px; font-weight: 700; color: var(--mu); border: 1px solid var(--bd); border-radius: 4px; padding: 2px 6px; height: fit-content">ALL</span><span>No new entries today. Restart from each strategy.</span></div>
+</div>
+
+<div class="n" style="display: flex; justify-content: space-between; background: var(--sf2); border-radius: 10px; padding: 12px"><span style="color: var(--mu)">LIVE P&amp;L locked in (est.)</span><span style="font-weight: 700; color: var(--up)">▲ +₹2,450</span></div>
+
+<div role="slider" aria-label="Slide to stop all and square off" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0" style="height: 54px; border-radius: 27px; background: var(--sf2); border: 1.5px solid var(--dn); display: flex; align-items: center; padding: 4px; box-sizing: border-box">
+<div style="width: 46px; height: 46px; border-radius: 23px; background: var(--dn); display: flex; align-items: center; justify-content: center; color: #fff"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></div>
+<span style="flex: 1; text-align: center; color: var(--dn); font-weight: 600; font-size: 14px">Slide to stop all</span>
+</div>
+<a href="Main.dc.html" style="height: 44px; display: flex; align-items: center; justify-content: center; text-decoration: none; font-weight: 600">Cancel</a>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { theme: this.props.theme ?? 'dark' };
+  }
+}
+</script>
+</body>
+</html>

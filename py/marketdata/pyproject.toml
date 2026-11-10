@@ -1,0 +1,19 @@
+[project]
+name = "tradedesk-marketdata"
+version = "0.1.0"
+description = "TradeDesk market-data store: Parquet + DuckDB, importers, data-quality checks"
+requires-python = ">=3.10"
+dependencies = ["duckdb>=1.1", "tradedesk-marketcal"]
+
+[project.scripts]
+td-data = "tradedesk_marketdata.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tradedesk_marketdata"]
+
+[tool.uv.sources]
+tradedesk-marketcal = { workspace = true }

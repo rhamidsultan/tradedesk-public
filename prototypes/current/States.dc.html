@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TradeDesk — Connection and market states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.dark{--bg:#0E1014;--sf:#161A21;--sf2:#1D222B;--bd:#2A303B;--tx:#E8EAEE;--mu:#A0A8B6;--ac:#5B9BFF;--up:#34C77B;--dn:#FF6B6B;--live:#F5A524;--onac:#0E1014;--onlive:#0E1014;--paper:#8FA3C0;--onpaper:#0E1014;--itm:rgba(91,155,255,0.10);--scrim:rgba(0,0,0,0.6)}
+.light{--bg:#F6F7F9;--sf:#FFFFFF;--sf2:#F0F2F5;--bd:#E2E5EA;--tx:#16191F;--mu:#5B6472;--ac:#2A63C7;--up:#0B7A45;--dn:#C42F2F;--live:#9A5B00;--onac:#FFFFFF;--onlive:#FFFFFF;--paper:#4F6B8F;--onpaper:#FFFFFF;--itm:rgba(42,99,199,0.08);--scrim:rgba(16,20,28,0.45)}
+.n{font-variant-numeric:tabular-nums}
+a{color:var(--ac)}a:hover{color:var(--tx)}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--bg); color: var(--tx); font-family: Inter, system-ui, sans-serif; font-size: 14px">
+
+<header style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 10px; border-bottom: 1px solid var(--bd)">
+<div class="n" style="display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--mu)">
+<span style="display: flex; align-items: center; gap: 5px"><svg width="8" height="8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill="{{dotC}}"></circle></svg>{{market}}</span>
+<span style="color: var(--tx); font-weight: {{tickW}}">{{tick}}</span>
+<span>{{kite}}</span>
+</div>
+<a href="StopAll.dc.html" aria-label="Stop all strategies and square off" style="height: 44px; display: flex; align-items: center; padding: 0 14px; border-radius: 22px; border: 1.5px solid var(--dn); color: var(--dn); font-weight: 600; font-size: 13px; text-decoration: none; box-sizing: border-box">Stop all</a>
+</header>
+
+<div role="status" style="margin: 12px 16px 0; border-radius: 12px; padding: 12px 14px; background: var(--sf2); border: 1.5px solid {{bannerB}}; display: flex; flex-direction: column; gap: 4px">
+<span style="font-weight: 700">{{bannerTitle}}</span>
+<span style="font-size: 13px; color: var(--mu); line-height: 1.5">{{bannerText}}</span>
+<sc-if value="{{extra}}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; line-height: 1.5; font-weight: 600">{{extraText}}</span></sc-if>
+</div>
+
+<main style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+<section style="display: flex; flex-direction: column; gap: 4px">
+<div style="font-size: 12px; color: var(--mu)">{{plLabel}}</div>
+<div class="n" style="font-size: 40px; font-weight: 700; color: {{plC}}">▲ +₹2,518</div>
+<div class="n" style="font-size: 13px; color: var(--mu)">{{plSub}}</div>
+</section>
+
+<section style="background: var(--sf); border: 1px solid var(--bd); border-radius: 12px; overflow: hidden; display: flex">
+<div style="width: 6px; background: var(--live)"></div>
+<div style="flex: 1; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; align-items: center"><span style="font-weight: 600">NIFTY premium strangle</span><span style="font-size: 11px; font-weight: 700; color: var(--onlive); background: var(--live); border-radius: 4px; padding: 2px 7px">LIVE</span></div>
+<div class="n" style="font-size: 13px; color: var(--mu)">{{stratLine}}</div>
+<div class="n" style="font-size: 12px; color: {{slC}}">{{slLine}}</div>
+</div>
+</section>
+
+<section style="display: flex; gap: 8px">
+<div style="flex: 1; text-align: center; padding: 10px 0; border-radius: 10px; background: var(--sf); border: 1px solid var(--bd); font-size: 13px">NIFTY <span class="n">25,842.10</span><br><span class="n" style="color: var(--mu); font-size: 12px">{{priceAge}}</span></div>
+<div style="flex: 1; text-align: center; padding: 10px 0; border-radius: 10px; background: var(--sf); border: 1px solid var(--bd); font-size: 13px">India VIX <span class="n">12.84</span><br><span class="n" style="color: var(--mu); font-size: 12px">{{priceAge}}</span></div>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"state":{"editor":"enum","options":["Feed stale","Phone offline","Market closed","Pre-open"],"default":"Feed stale"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.props.state ?? 'Feed stale';
+    const v = {
+      'Feed stale': { market: 'Market open', dotC: 'var(--up)', tick: '⚠ Last tick 10:41:02 · 47 s', tickW: 700, kite: 'Kite ✓', bannerB: 'var(--tx)',
+        bannerTitle: '⚠ Prices are 47 s old', bannerText: 'New entries are paused. The app cannot see prices, so its −₹8,000 daily square-off is blind. Retrying every 5 s.',
+        extra: true, extraText: 'Right now the SL orders at Kite are your only cap: up to −₹24,310.',
+        plLabel: 'LIVE P&L · STALE · as of 10:41:02', plC: 'var(--mu)', plSub: 'Not updating',
+        stratLine: 'Entries paused · 2 legs open', slLine: 'SL orders at Kite ✓ (work without our feed)', slC: 'var(--up)', priceAge: 'STALE · 10:41:02' },
+      'Phone offline': { market: 'Market open', dotC: 'var(--up)', tick: '⚠ Offline since 10:44', tickW: 700, kite: 'Server ✓', bannerB: 'var(--tx)',
+        bannerTitle: '⚠ Your phone is offline', bannerText: 'Strategies keep running on the server with their limits. Alerts come by SMS and email until you reconnect.',
+        extra: true, extraText: 'Stop all can\'t be sent from here. If urgent, call Zerodha Call & Trade (number in Settings).',
+        plLabel: 'LIVE P&L · last seen 10:44', plC: 'var(--mu)', plSub: 'Reconnecting… on reconnect we show prices first, then ask again',
+        stratLine: 'Running on server · 2 legs open', slLine: 'SL orders at Kite ✓', slC: 'var(--up)', priceAge: 'at 10:44' },
+      'Market closed': { market: 'Closed · opens Mon 26 Oct 09:15', dotC: 'var(--mu)', tick: 'Closed 15:30', tickW: 400, kite: 'Kite ✓', bannerB: 'var(--dn)',
+        bannerTitle: '2 LIVE legs held overnight · no SL at Kite', bannerText: 'Day SL orders expired at 15:30. They are placed again at 09:15 after Monday\'s login. A gap open is not capped until then.',
+        extra: false, extraText: '',
+        plLabel: 'LIVE P&L Fri 23 Oct · at close, positions still open', plC: 'var(--up)', plSub: 'Realised ₹0 · open ▲ +₹2,730 · charges ₹212',
+        stratLine: 'Carried · NRML · expiry Tue 27 Oct', slLine: '✕ No SL at Kite overnight · gap risk open', slC: 'var(--dn)', priceAge: 'Close' },
+      'Pre-open': { market: 'Pre-open 09:04 · trading 09:15', dotC: 'var(--mu)', tick: 'Indicative', tickW: 400, kite: 'Kite ✓ 08:52', bannerB: 'var(--ac)',
+        bannerTitle: 'Getting ready for 09:15', bannerText: 'Positions match Kite ✓. 2 SL orders go out at 09:15:00. If NIFTY opens past a trigger, that leg exits at once.',
+        extra: false, extraText: '',
+        plLabel: 'Open P&L at yesterday\'s close', plC: 'var(--mu)', plSub: 'Today starts at 09:15',
+        stratLine: 'Waiting for 09:15 · 2 legs open', slLine: 'SL orders queued for 09:15:00', slC: 'var(--mu)', priceAge: 'Pre-open price' }
+    }[s];
+    return { theme: this.props.theme ?? 'dark', ...v };
+  }
+}
+</script>
+</body>
+</html>

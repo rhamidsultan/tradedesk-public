@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TradeDesk — Builder risk step</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.dark{--bg:#0E1014;--sf:#161A21;--sf2:#1D222B;--bd:#2A303B;--tx:#E8EAEE;--mu:#A0A8B6;--ac:#5B9BFF;--up:#34C77B;--dn:#FF6B6B;--live:#F5A524;--onac:#0E1014;--onlive:#0E1014;--paper:#8FA3C0;--onpaper:#0E1014;--itm:rgba(91,155,255,0.10);--scrim:rgba(0,0,0,0.6)}
+.light{--bg:#F6F7F9;--sf:#FFFFFF;--sf2:#F0F2F5;--bd:#E2E5EA;--tx:#16191F;--mu:#5B6472;--ac:#2A63C7;--up:#0B7A45;--dn:#C42F2F;--live:#9A5B00;--onac:#FFFFFF;--onlive:#FFFFFF;--paper:#4F6B8F;--onpaper:#FFFFFF;--itm:rgba(42,99,199,0.08);--scrim:rgba(16,20,28,0.45)}
+.n{font-variant-numeric:tabular-nums}
+a{color:var(--ac)}a:hover{color:var(--tx)}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--bg); color: var(--tx); font-family: Inter, system-ui, sans-serif; font-size: 14px">
+
+<header style="padding: 10px 8px 12px; border-bottom: 1px solid var(--bd); display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; gap: 4px">
+<a href="Templates.dc.html" aria-label="Back to templates" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--tx)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+<div style="display: flex; flex-direction: column"><span style="font-weight: 600; font-size: 16px">Opening range breakout</span><span style="font-size: 12px; color: var(--mu)">NIFTY · options · 5 min · draft</span></div>
+</div>
+<ol aria-label="Builder steps" style="list-style: none; margin: 0; padding: 0 8px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px">
+<sc-for list="{{steps}}" as="s" hint-placeholder-count="7">
+<li style="display: flex; flex-direction: column; gap: 5px; align-items: center; font-size: 11px; color: {{s.fg}}; font-weight: {{s.w}}"><div style="height: 4px; width: 100%; border-radius: 2px; background: {{s.bar}}"></div>{{s.label}}</li>
+</sc-for>
+</ol>
+</header>
+
+<main style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 18px">
+
+<section style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; justify-content: space-between"><h2 style="margin: 0; font-size: 15px">Stop loss</h2><span style="font-size: 11px; color: var(--dn); font-weight: 600">REQUIRED</span></div>
+<div role="radiogroup" aria-label="Stop loss measured on" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--sf2); border-radius: 10px; padding: 3px">
+<sc-for list="{{slTypes}}" as="o" hint-placeholder-count="3">
+<button role="radio" aria-checked="{{o.on}}" onClick="{{o.pick}}" style="height: 44px; border: 1.5px solid {{o.border}}; border-radius: 8px; background: {{o.bg}}; color: {{o.fg}}; font: 600 13px Inter, sans-serif">{{o.label}}</button>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; background: var(--sf); border: 1px solid var(--bd); border-radius: 12px; padding: 8px">
+<button onClick="{{dec}}" aria-label="Decrease stop loss" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--bd); background: var(--sf2); color: var(--tx); font-size: 22px">−</button>
+<div style="text-align: center"><div class="n" style="font-size: 26px; font-weight: 700">{{sl}} <span style="font-size: 14px; color: var(--mu); font-weight: 500">{{slUnit}}</span></div><div style="font-size: 12px; color: var(--mu)">{{slHint}}</div></div>
+<button onClick="{{inc}}" aria-label="Increase stop loss" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--bd); background: var(--sf2); color: var(--tx); font-size: 22px">+</button>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 15px">Target</h2>
+<div style="display: flex; gap: 8px">
+<sc-for list="{{rrs}}" as="r" hint-placeholder-count="4">
+<button onClick="{{r.pick}}" style="flex: 1; height: 44px; border-radius: 10px; border: 1px solid {{r.border}}; background: {{r.bg}}; color: {{r.fg}}; font: 600 13px Inter, sans-serif">{{r.label}}</button>
+</sc-for>
+</div>
+<label style="display: flex; justify-content: space-between; align-items: center; min-height: 44px; background: var(--sf); border: 1px solid var(--bd); border-radius: 12px; padding: 0 14px">
+<span style="display: flex; flex-direction: column"><span>Trail stop after 1R</span><span style="font-size: 12px; color: var(--mu)">Move SL to cost, then every 10 pts</span></span>
+<input type="checkbox" checked="{{trail}}" onChange="{{toggleTrail}}" style="width: 22px; height: 22px; accent-color: var(--ac)">
+</label>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 15px">Size and limits</h2>
+<div style="background: var(--sf); border: 1px solid var(--bd); border-radius: 12px">
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--bd)"><span>Risk per trade</span><span class="n" style="font-weight: 600">₹4,000 <span style="color: var(--mu); font-weight: 400">· 2%</span></span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--bd)"><span>Lots (from risk)</span><span class="n" style="font-weight: 600">{{lots}} lots · {{qty}} qty</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--bd)"><span>Max loss per day</span><span class="n" style="font-weight: 600">₹8,000 <span style="color: var(--mu); font-weight: 400">· 4%</span></span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px"><span>Trades per day</span><span class="n" style="font-weight: 600">2 · re-entry after SL: 1</span></div>
+</div>
+<sc-if value="{{over}}" hint-placeholder-val="{{ false }}">
+<div role="alert" style="border: 1.5px solid var(--dn); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px">
+<div class="n" style="color: var(--dn); font-weight: 600; font-size: 13px">1 lot risks ≈₹{{maxLoss}}, above your ₹4,000 budget ({{overPct}}).</div>
+<div style="font-size: 12px; color: var(--mu)">Tighten the stop loss, or accept the higher risk for this strategy.</div>
+<label style="display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 13px"><input type="checkbox" checked="{{ack}}" onChange="{{toggleAck}}" style="width: 22px; height: 22px; accent-color: var(--dn)">Accept {{overPct}} risk per trade</label>
+</div>
+</sc-if>
+<div style="font-size: 12px; color: var(--mu); line-height: 1.5">≈ Option loss estimated at delta 0.5 of the spot stop; the backtest uses real option prices. A spot stop is held by the app, so a backstop SL order at −40% of premium is also placed at Kite.</div>
+</section>
+</main>
+
+<footer style="border-top: 1px solid var(--bd); background: var(--sf); padding: 12px 16px 26px; display: flex; flex-direction: column; gap: 10px">
+<div class="n" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-size: 12px; color: var(--mu)">
+<div>Max loss / trade<div style="font-size: 15px; font-weight: 700; color: var(--dn)">▼ ≈−₹{{maxLoss}}</div></div>
+<div>Target / trade<div style="font-size: 15px; font-weight: 700; color: var(--up)">{{target}}</div></div>
+<div>Charges / trade<div style="font-size: 15px; font-weight: 700; color: var(--tx)">≈₹{{charges}}</div></div>
+</div>
+<sc-if value="{{canNext}}" hint-placeholder-val="{{ true }}">
+<a href="Backtest.dc.html" style="height: 50px; border-radius: 12px; background: var(--ac); color: var(--onac); text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px">Next: Exit rules</a>
+</sc-if>
+<sc-if value="{{blocked}}" hint-placeholder-val="{{ false }}">
+<button disabled style="height: 50px; border-radius: 12px; border: 1px solid var(--bd); background: var(--sf2); color: var(--mu); font: 600 15px Inter, sans-serif">Accept the higher risk to continue</button>
+</sc-if>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { slType: 'spot', sl: 30, rr: 2, trail: true }; }
+  renderVals() {
+    const st = this.state;
+    const types = [{ id: 'spot', label: 'Spot points' }, { id: 'opt', label: 'Option %' }, { id: 'atr', label: 'ATR ×' }];
+    const step = st.slType === 'spot' ? 5 : st.slType === 'opt' ? 5 : 0.5;
+    const perLotRisk = st.slType === 'spot' ? st.sl * 0.5 * 65 : st.slType === 'opt' ? 118 * st.sl / 100 * 65 : st.sl * 22 * 0.5 * 65;
+    const lots = Math.max(1, Math.floor(4000 / perLotRisk));
+    const maxLoss = Math.round(lots * perLotRisk);
+    const fmt = (v) => v.toLocaleString('en-IN');
+    const steps = ['Instrument', 'Entry', 'Legs', 'Risk', 'Exit', 'Schedule', 'Review'];
+    return {
+      theme: this.props.theme ?? 'dark',
+      steps: steps.map((s, i) => ({ label: s, bar: i < 3 ? 'var(--up)' : i === 3 ? 'var(--ac)' : 'var(--bd)', fg: i === 3 ? 'var(--tx)' : 'var(--mu)', w: i === 3 ? 700 : 400 })),
+      slTypes: types.map((t) => ({ label: t.label, on: st.slType === t.id ? 'true' : 'false', bg: st.slType === t.id ? 'var(--sf)' : 'transparent',
+        border: st.slType === t.id ? 'var(--ac)' : 'transparent', fg: st.slType === t.id ? 'var(--ac)' : 'var(--mu)',
+        pick: () => this.setState({ slType: t.id, sl: t.id === 'spot' ? 30 : t.id === 'opt' ? 25 : 1.5, ack: false }) })),
+      over: maxLoss > 4000,
+      overPct: (maxLoss / 2000).toFixed(2) + '%',
+      ack: !!st.ack,
+      toggleAck: () => this.setState({ ack: !st.ack }),
+      canNext: maxLoss <= 4000 || !!st.ack,
+      blocked: maxLoss > 4000 && !st.ack,
+      sl: st.sl,
+      slUnit: st.slType === 'spot' ? 'pts' : st.slType === 'opt' ? '%' : '× ATR',
+      slHint: st.slType === 'spot' ? 'on NIFTY spot, from entry' : st.slType === 'opt' ? 'of option entry price' : 'ATR(14) on 5 min',
+      dec: () => this.setState({ sl: Math.max(step, +(st.sl - step).toFixed(1)) }),
+      inc: () => this.setState({ sl: +(st.sl + step).toFixed(1) }),
+      rrs: [1.5, 2, 3, 'None'].map((r) => ({ label: r === 'None' ? 'None' : '1:' + r, pick: () => this.setState({ rr: r }),
+        bg: st.rr === r ? 'var(--ac)' : 'var(--sf)', fg: st.rr === r ? 'var(--onac)' : 'var(--tx)', border: st.rr === r ? 'var(--ac)' : 'var(--bd)' })),
+      trail: st.trail,
+      toggleTrail: () => this.setState({ trail: !st.trail }),
+      lots: lots, qty: lots * 65,
+      maxLoss: fmt(maxLoss),
+      target: st.rr === 'None' ? 'Trail only' : '+₹' + fmt(Math.round(maxLoss * st.rr)),
+      charges: fmt(Math.round(lots * 60 + 66))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "id": "orb_nifty", "name": "NIFTY opening range breakout", "version": 1,
+  "instrument": {"underlying": "NIFTY", "timeframe": "5m"},
+  "schedule": {"start": "09:30", "no_new_after": "14:30", "exit_by": "15:15"},
+  "entry": {"any_of": [
+    {"all_of": [{"left": "close", "op": "crosses_above", "right": "opening_range_high(15)"}], "action": "long"},
+    {"all_of": [{"left": "close", "op": "crosses_below", "right": "opening_range_low(15)"}], "action": "short"}
+  ]},
+  "legs": [
+    {"when": "long", "side": "BUY", "type": "CE", "expiry": "nearest_weekly", "strike": {"by": "atm_offset", "value": 0}, "lots": "from_risk"},
+    {"when": "short", "side": "BUY", "type": "PE", "expiry": "nearest_weekly", "strike": {"by": "atm_offset", "value": 0}, "lots": "from_risk"}
+  ],
+  "risk": {
+    "stop_loss": {"on": "underlying", "type": "points", "value": 30},
+    "target": {"on": "underlying", "type": "rr", "value": 2},
+    "risk_per_trade": 4000, "max_lots": 10, "max_loss_per_day": 8000, "max_trades_per_day": 2
+  },
+  "notes": "Defaults from the approved prototypes: 2% risk per trade, 4% daily loss on ₹2 L."
+}

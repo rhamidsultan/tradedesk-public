@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TradeDesk — Strangle risk check</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.dark{--bg:#0E1014;--sf:#161A21;--sf2:#1D222B;--bd:#2A303B;--tx:#E8EAEE;--mu:#A0A8B6;--ac:#5B9BFF;--up:#34C77B;--dn:#FF6B6B;--live:#F5A524;--onac:#0E1014;--onlive:#0E1014;--paper:#8FA3C0;--onpaper:#0E1014;--itm:rgba(91,155,255,0.10);--scrim:rgba(0,0,0,0.6)}
+.light{--bg:#F6F7F9;--sf:#FFFFFF;--sf2:#F0F2F5;--bd:#E2E5EA;--tx:#16191F;--mu:#5B6472;--ac:#2A63C7;--up:#0B7A45;--dn:#C42F2F;--live:#9A5B00;--onac:#FFFFFF;--onlive:#FFFFFF;--paper:#4F6B8F;--onpaper:#FFFFFF;--itm:rgba(42,99,199,0.08);--scrim:rgba(16,20,28,0.45)}
+.n{font-variant-numeric:tabular-nums}
+a{color:var(--ac)}a:hover{color:var(--tx)}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--bg); color: var(--tx); font-family: Inter, system-ui, sans-serif; font-size: 14px">
+
+<header style="padding: 10px 8px 12px; border-bottom: 1px solid var(--bd); display: flex; align-items: center; gap: 4px">
+<a href="Templates.dc.html" aria-label="Back" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--tx)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+<div style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 600; font-size: 16px">Premium-matched strangle</span><span style="font-size: 12px; color: var(--mu)">Risk step · sells ~₹40 CE + PE · capital ₹2,00,000</span></div>
+</header>
+
+<main style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between"><h2 style="margin: 0; font-size: 15px">Stop loss per leg</h2><span style="font-size: 12px; color: var(--mu)">Trigger × premium sold</span></div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{mults}}" as="m" hint-placeholder-count="4">
+<button onClick="{{m.pick}}" aria-pressed="{{m.on}}" style="height: 44px; border-radius: 10px; border: 1.5px solid {{m.border}}; background: {{m.bg}}; color: {{m.fg}}; font: 600 14px Inter, sans-serif">{{m.label}}</button>
+</sc-for>
+</div>
+<div class="n" style="font-size: 12px; color: var(--mu)">CE Trigger ₹{{ceT}} · Limit ₹{{ceL}} &#160;·&#160; PE Trigger ₹{{peT}} · Limit ₹{{peL}}</div>
+</section>
+
+<section style="display: flex; align-items: center; justify-content: space-between; background: var(--sf); border: 1px solid var(--bd); border-radius: 12px; padding: 8px 8px 8px 14px">
+<div><div style="font-weight: 600">Lots per leg</div><div class="n" style="font-size: 12px; color: var(--mu)">qty {{qty}} · margin ≈ ₹{{margin}} of ₹3.02 L free</div></div>
+<div style="display: flex; align-items: center; gap: 8px">
+<button onClick="{{lotDn}}" aria-label="Fewer lots" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--bd); background: var(--sf2); color: var(--tx); font-size: 22px">−</button>
+<span class="n" style="width: 24px; text-align: center; font-size: 20px; font-weight: 700">{{lots}}</span>
+<button onClick="{{lotUp}}" aria-label="More lots" disabled="{{atMax}}" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--bd); background: var(--sf2); color: var(--tx); font-size: 22px; opacity: {{upOp}}">+</button>
+</div>
+</section>
+<sc-if value="{{atMax}}" hint-placeholder-val="{{ true }}"><div style="font-size: 12px; color: var(--mu); margin-top: -6px">2 lots is the most your free margin allows.</div></sc-if>
+
+<section style="background: var(--sf); border: 1.5px solid {{verdictC}}; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+<div style="font-weight: 600">If the app or feed is down</div>
+<div class="n" style="display: flex; justify-content: space-between; align-items: baseline"><span style="font-size: 13px; color: var(--mu)">Both SLs fill at their limit</span><span style="font-size: 24px; font-weight: 700; color: var(--dn)">▼ −₹{{worst}}</span></div>
+<div style="position: relative; height: 12px; background: var(--sf2); border-radius: 6px">
+<div style="height: 12px; width: {{barW}}; background: {{verdictC}}; border-radius: 6px"></div>
+<div style="position: absolute; left: {{tradeX}}; top: -4px; width: 2px; height: 20px; background: var(--mu)"></div>
+<div style="position: absolute; left: {{capX}}; top: -4px; width: 2px; height: 20px; background: var(--tx)"></div>
+</div>
+<div class="n" style="display: flex; justify-content: space-between; font-size: 12px; color: var(--mu)"><span>{{worstPct}} of capital</span><span>marks: 2% trade · 4% day</span></div>
+<div style="font-size: 13px; font-weight: 600; color: {{verdictC}}">{{verdict}}</div>
+<div style="font-size: 12px; color: var(--mu); line-height: 1.5">More if an SL triggers but does not fill. Normally the app squares off at −₹8,000. Overnight, day SL orders expire and are re-placed at 09:15.</div>
+</section>
+
+<sc-if value="{{over}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 13px; font-weight: 600">Bring it under your limits</div>
+<button onClick="{{fixA}}" style="min-height: 48px; text-align: left; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--bd); background: var(--sf); color: var(--tx); font: 500 13px Inter, sans-serif">1.5× SL · 1 lot · worst −₹{{fa}} ✓ inside 2%</button>
+<button onClick="{{fixB}}" style="min-height: 48px; text-align: left; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--bd); background: var(--sf); color: var(--tx); font: 500 13px Inter, sans-serif">1.5× SL · 2 lots · worst −₹{{fb}} ✓ inside 4% day cap</button>
+<div style="font-size: 12px; color: var(--mu)">A tighter SL is hit more often — re-run the backtest after changing it.</div>
+<label style="display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-size: 13px; color: var(--dn); font-weight: 600"><input type="checkbox" checked="{{ack}}" onChange="{{toggleAck}}" style="width: 22px; height: 22px; flex: none; accent-color: var(--dn)">I accept losing up to ₹{{worst}} ({{worstPct}} of capital) if the app is down</label>
+</div>
+</sc-if>
+</main>
+
+<footer style="border-top: 1px solid var(--bd); background: var(--sf); padding: 12px 16px 26px; display: flex; flex-direction: column; gap: 10px">
+<div class="n" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-size: 12px; color: var(--mu)">
+<div>Premium in<div style="font-size: 15px; font-weight: 700; color: var(--up)">+₹{{credit}}</div></div>
+<div>App limit<div style="font-size: 15px; font-weight: 700; color: var(--dn)">−₹8,000</div></div>
+<div>App down<div style="font-size: 15px; font-weight: 700; color: var(--dn)">−₹{{worst}}</div></div>
+</div>
+<sc-if value="{{canNext}}" hint-placeholder-val="{{ false }}">
+<a href="Backtest.dc.html" style="height: 50px; border-radius: 12px; background: var(--ac); color: var(--onac); text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px">Save and backtest</a>
+</sc-if>
+<sc-if value="{{blocked}}" hint-placeholder-val="{{ true }}">
+<button disabled style="height: 50px; border-radius: 12px; border: 1px solid var(--bd); background: var(--sf2); color: var(--mu); font: 600 15px Inter, sans-serif">Fix or accept the risk to continue</button>
+</sc-if>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { m: 3, lots: 2, ack: false }; }
+  renderVals() {
+    const st = this.state;
+    const ce = 42.5, pe = 38.8, lot = 65, maxLots = 2;
+    const lim = (p, m) => Math.ceil(p * m * 1.1 * 20) / 20;
+    const worstOf = (m, lots) => Math.round(((lim(ce, m) - ce) + (lim(pe, m) - pe)) * lot * lots);
+    const worst = worstOf(st.m, st.lots);
+    const tradeCap = 4000, cap = 8000, scale = 26000;
+    const over = worst > cap;
+    const fmt = (v) => v.toLocaleString('en-IN');
+    return {
+      theme: this.props.theme ?? 'dark',
+      mults: [1.5, 2, 2.5, 3].map((m) => ({ label: m + '×', on: st.m === m ? 'true' : 'false', pick: () => this.setState({ m: m, ack: false }),
+        bg: st.m === m ? 'var(--ac)' : 'var(--sf)', fg: st.m === m ? 'var(--onac)' : 'var(--tx)', border: st.m === m ? 'var(--ac)' : 'var(--bd)' })),
+      ceT: (ce * st.m).toFixed(2), ceL: lim(ce, st.m).toFixed(2), peT: (pe * st.m).toFixed(2), peL: lim(pe, st.m).toFixed(2),
+      lots: st.lots, qty: st.lots * lot, margin: fmt(st.lots * 125000),
+      atMax: st.lots >= maxLots, upOp: st.lots >= maxLots ? 0.4 : 1,
+      lotDn: () => this.setState({ lots: Math.max(1, st.lots - 1), ack: false }),
+      lotUp: () => this.setState({ lots: Math.min(maxLots, st.lots + 1), ack: false }),
+      worst: fmt(worst), worstPct: (worst / 2000).toFixed(1) + '%',
+      barW: Math.min(100, worst / scale * 100) + '%', capX: (cap / scale * 100) + '%', tradeX: (tradeCap / scale * 100) + '%',
+      over: over,
+      verdictC: over ? 'var(--dn)' : 'var(--up)',
+      verdict: over ? '✕ ' + (worst / cap).toFixed(1) + '× your daily cap' : (worst > tradeCap ? '✓ Inside the day cap · above 2% per trade' : '✓ Inside 2% per trade'),
+      fa: fmt(worstOf(1.5, 1)), fb: fmt(worstOf(1.5, 2)),
+      fixA: () => this.setState({ m: 1.5, lots: 1, ack: false }),
+      fixB: () => this.setState({ m: 1.5, lots: 2, ack: false }),
+      ack: st.ack, toggleAck: () => this.setState({ ack: !st.ack }),
+      canNext: !over || st.ack, blocked: over && !st.ack,
+      credit: fmt(Math.round((ce + pe) * lot * st.lots))
+    };
+  }
+}
+</script>
+</body>
+</html>

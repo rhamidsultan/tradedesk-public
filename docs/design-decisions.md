@@ -1,0 +1,26 @@
+# Design decisions
+
+- 22 Oct 2026 · Calm, Kite-like look; dark default, light option. Inter with tabular numbers.
+- 22 Oct 2026 · Mode colours: LIVE = amber band + filled chip; PAPER = grey-blue band + filled chip. Every screen and sheet shows the mode at the top edge.
+- 22 Oct 2026 · LIVE commits use slide-to-confirm; PAPER commits are one tap.
+- 22 Oct 2026 · Risk is shown twice for short options: app square-off limit and the broker-SL worst case ("if app down").
+- 22 Oct 2026 · Stops are labelled by unit and owner: "option · at Kite" or "NIFTY spot · app-held". App-held stops always get a backstop SL at Kite in live.
+- 22 Oct 2026 · Home P&L is LIVE net of charges; PAPER is shown separately, never summed.
+- 22 Oct 2026 · Templates have "Paper trade it" (3 taps) and "Customise" (full builder).
+- 22 Oct 2026 · Builder blocks Next when 1 lot exceeds the risk budget until the user accepts the higher %.
+- 22 Oct 2026 · Owner set default risk to 2% per trade and 4% max loss per day; deploy sheet flags when size differs from the backtest run.
+- 22 Oct 2026 · Every worst-case loss is priced at the SL **limit** (not trigger), with "more if it doesn't fill".
+- 22 Oct 2026 · Amber is reserved for LIVE. Warnings use a neutral ⚠ style.
+- 22 Oct 2026 · Strangle risk step blocks when the app-down worst case exceeds the 4% day cap, unless the user accepts the exact ₹ amount.
+- 22 Oct 2026 · Overnight NRML shorts: day SL orders expire at 15:30; re-placed at 09:15 after login; if the open is past the trigger, exit at once. Evaluate Zerodha GTT as overnight backstop in architecture.
+- 22 Oct 2026 · On a position mismatch the app resizes broker SLs to the actual quantity before anything else.
+- 22 Oct 2026 · **Owner approved prototypes (16 screens, round 3).** Next: architecture.
+- 22 Oct 2026 · Owner agreed to run a 1-lot live test of the overnight GTT flow (architecture §6.6) before any overnight strangle goes live. Overnight NRML shorts stay disabled in live until it passes.
+- 22 Oct 2026 · Overnight GTT limit = trigger + 10% (same as day SL). Revisit only if the 1-lot test shows missed fills on gaps.
+- 22 Oct 2026 · No default wings on strangle templates (owner choice). Gap risk beyond the GTT limit stays uncapped and must stay visible on risk screens.
+- 22 Oct 2026 · Kite Connect (₹500/month) only for users trading live; paper users run on the owner's feed.
+- 22 Oct 2026 · Alert channels decided (see below).
+- 22 Oct 2026 · Historical data: owner already has ~2 years (incl. expired NIFTY/BANKNIFTY options from TrueData). Milestone 1 imports it into the new store and checks quality; no vendor purchase for now.
+- 22 Oct 2026 · No confirmation email to Zerodha needed (family-only use).
+- 22 Oct 2026 · A manual trade in the Kite app on a live instrument stops the strategy as a mismatch until the owner resolves it.
+- 22 Oct 2026 · Alerts: CRITICAL (incidents, daily loss hit, login needed before 09:15, server down) → push + WhatsApp, repeated every 2 min until acknowledged. INFO (fills, start/stop, daily P&L) → push + evening email summary. WhatsApp via Meta Cloud API (official), needed by the live milestone. No SMS in v1.

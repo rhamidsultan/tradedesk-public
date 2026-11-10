@@ -1,0 +1,26 @@
+[project]
+name = "tradedesk"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["tradedesk-marketcal", "tradedesk-marketdata", "tradedesk-spec", "tradedesk-engine", "tradedesk-api", "tradedesk-live", "tradedesk-alerts", "tradedesk-oms", "tradedesk-strategies"]
+
+[tool.uv.workspace]
+members = ["py/marketcal", "py/marketdata", "py/spec", "py/engine", "py/api", "py/live", "py/alerts", "py/oms", "py/strategies"]
+
+[tool.uv.sources]
+tradedesk-marketcal = { workspace = true }
+tradedesk-marketdata = { workspace = true }
+tradedesk-spec = { workspace = true }
+tradedesk-engine = { workspace = true }
+tradedesk-api = { workspace = true }
+tradedesk-live = { workspace = true }
+tradedesk-alerts = { workspace = true }
+tradedesk-oms = { workspace = true }
+tradedesk-strategies = { workspace = true }
+
+[dependency-groups]
+dev = ["pytest>=8", "httpx>=0.27"]
+lab = ["streamlit>=1.35"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

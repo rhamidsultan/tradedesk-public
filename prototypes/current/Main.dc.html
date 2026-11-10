@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TradeDesk — Home</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.dark{--bg:#0E1014;--sf:#161A21;--sf2:#1D222B;--bd:#2A303B;--tx:#E8EAEE;--mu:#A0A8B6;--ac:#5B9BFF;--up:#34C77B;--dn:#FF6B6B;--live:#F5A524;--onac:#0E1014;--onlive:#0E1014;--paper:#8FA3C0;--onpaper:#0E1014;--itm:rgba(91,155,255,0.10);--scrim:rgba(0,0,0,0.6)}
+.light{--bg:#F6F7F9;--sf:#FFFFFF;--sf2:#F0F2F5;--bd:#E2E5EA;--tx:#16191F;--mu:#5B6472;--ac:#2A63C7;--up:#0B7A45;--dn:#C42F2F;--live:#9A5B00;--onac:#FFFFFF;--onlive:#FFFFFF;--paper:#4F6B8F;--onpaper:#FFFFFF;--itm:rgba(42,99,199,0.08);--scrim:rgba(16,20,28,0.45)}
+.n{font-variant-numeric:tabular-nums}
+a{color:var(--ac)}a:hover{color:var(--tx)}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--bg); color: var(--tx); font-family: Inter, system-ui, sans-serif; font-size: 14px">
+
+<header style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 10px; border-bottom: 1px solid var(--bd)">
+<div style="display: flex; gap: 12px; align-items: center; font-size: 12px; color: var(--mu)">
+<span style="display: flex; align-items: center; gap: 5px"><svg width="8" height="8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill="var(--up)"></circle></svg>Market open</span>
+<span class="n">Tick 10:46:11</span>
+<span>Kite ✓</span>
+</div>
+<a href="StopAll.dc.html" aria-label="Stop all strategies and square off" style="height: 44px; display: flex; align-items: center; gap: 6px; padding: 0 14px; border-radius: 22px; border: 1.5px solid var(--dn); color: var(--dn); font-weight: 600; font-size: 13px; text-decoration: none; box-sizing: border-box">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v9"></path><path d="M6.3 7.3a8 8 0 1 0 11.4 0"></path></svg>Stop all</a>
+</header>
+
+<main style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px">
+
+<section style="display: flex; flex-direction: column; gap: 4px">
+<div style="font-size: 12px; color: var(--mu)">Thu 22 Oct · LIVE P&amp;L today, net of charges</div>
+<div class="n" style="font-size: 40px; font-weight: 700; color: var(--up); letter-spacing: -0.5px">▲ +₹2,518</div>
+<div class="n" style="font-size: 13px; color: var(--mu)">+1.26% on ₹2,00,000 · gross +₹2,730 · charges ₹212</div>
+<div class="n" style="font-size: 13px; color: var(--paper)">PAPER today ▲ +₹1,104 (not real money)</div>
+</section>
+
+<section style="background: var(--sf); border: 1px solid var(--bd); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; justify-content: space-between; font-size: 13px"><span style="font-weight: 600">Daily loss limit · LIVE</span><span class="n" style="color: var(--mu)">₹0 used of ₹8,000</span></div>
+<div style="height: 8px; background: var(--sf2); border-radius: 4px"></div>
+<div class="n" style="font-size: 12px; color: var(--mu); line-height: 1.5">App squares off at −₹8,000 (4%). If the app or feed is down, the SL orders at Kite cap it at <span style="color: var(--dn); font-weight: 600">−₹24,310</span> if they fill at their limit.</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; justify-content: space-between; align-items: baseline"><h2 style="margin: 0; font-size: 16px">Running</h2><span style="font-size: 13px; color: var(--mu)">1 live · 2 paper</span></div>
+
+<a href="Session.dc.html" style="text-decoration: none; color: var(--tx); background: var(--sf); border: 1px solid var(--bd); border-radius: 12px; overflow: hidden; display: flex">
+<div style="width: 6px; background: var(--live)"></div>
+<div style="flex: 1; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; align-items: center"><span style="font-weight: 600">NIFTY premium strangle</span><span style="font-size: 11px; font-weight: 700; color: var(--onlive); background: var(--live); border-radius: 4px; padding: 2px 7px">LIVE</span></div>
+<div class="n" style="display: flex; justify-content: space-between; font-size: 13px"><span style="color: var(--mu)">2 legs · −130 (2 lots) · NRML · 27 Oct</span><span style="color: var(--up); font-weight: 600">▲ +₹2,518</span></div>
+<div class="n" style="font-size: 12px; color: var(--mu)">Max loss −₹8,000 (app) · −₹24,310 if app down</div>
+</div>
+</a>
+
+<a href="Positions.dc.html" style="text-decoration: none; color: var(--tx); background: var(--sf); border: 1px solid var(--bd); border-radius: 12px; overflow: hidden; display: flex">
+<div style="width: 6px; background: var(--paper)"></div>
+<div style="flex: 1; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; align-items: center"><span style="font-weight: 600">NIFTY ORB breakout</span><span style="font-size: 11px; font-weight: 700; color: var(--onpaper); background: var(--paper); border-radius: 4px; padding: 2px 7px">PAPER</span></div>
+<div class="n" style="display: flex; justify-content: space-between; font-size: 13px"><span style="color: var(--mu)">BUY 25850 CE · 65 (1 lot) · MIS</span><span style="color: var(--up); font-weight: 600">▲ +₹1,104</span></div>
+<div class="n" style="font-size: 12px; color: var(--mu)">SL NIFTY ≤ 25,812 · app-held ⚠ · max loss ≈−₹975</div>
+</div>
+</a>
+
+<div style="background: var(--sf); border: 1px dashed var(--bd); border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center">
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-weight: 600">Supertrend intraday</span><span style="font-size: 12px; color: var(--mu)">PAPER · waiting for a signal after 09:30</span></div>
+<span style="font-size: 12px; color: var(--mu)">No position</span>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; font-size: 16px">Alerts</h2>
+<div style="font-size: 13px; display: flex; gap: 10px; align-items: flex-start"><span class="n" style="color: var(--mu); width: 40px">10:45</span><span>Strangle: CE 31.20 / PE 29.10 = 1.07× · no roll (rolls at 2×)</span></div>
+<div style="font-size: 13px; display: flex; gap: 10px; align-items: flex-start"><span class="n" style="color: var(--mu); width: 40px">09:46</span><span><span style="color: var(--paper); font-weight: 600">PAPER</span> ORB filled: BUY 25850 CE @ 118.40</span></div>
+</section>
+
+<section style="display: flex; gap: 8px">
+<a href="OptionChain.dc.html" style="flex: 1; text-decoration: none; text-align: center; padding: 10px 0; border-radius: 10px; background: var(--sf); border: 1px solid var(--bd); color: var(--tx); font-size: 13px">NIFTY <span class="n">25,842.10</span><br><span class="n" style="color: var(--up)">▲ +0.42%</span></a>
+<a href="OptionChain.dc.html" style="flex: 1; text-decoration: none; text-align: center; padding: 10px 0; border-radius: 10px; background: var(--sf); border: 1px solid var(--bd); color: var(--tx); font-size: 13px">India VIX <span class="n">12.84</span><br><span class="n" style="color: var(--dn)">▼ −3.10%</span></a>
+</section>
+</main>
+
+<nav aria-label="Main" style="display: flex; border-top: 1px solid var(--bd); background: var(--sf); padding-bottom: 18px">
+<a href="Main.dc.html" style="flex: 1; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-decoration: none; color: var(--ac); font-size: 12px; font-weight: 600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Home</a>
+<a href="Templates.dc.html" style="flex: 1; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-decoration: none; color: var(--mu); font-size: 12px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"></path><path d="M3 13l9 5 9-5"></path></svg>Strategies</a>
+<a href="OptionChain.dc.html" style="flex: 1; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-decoration: none; color: var(--mu); font-size: 12px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"></path><path d="M15 7h6v6"></path></svg>Trade</a>
+<a href="Positions.dc.html" style="flex: 1; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-decoration: none; color: var(--mu); font-size: 12px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1"></path></svg>Orders</a>
+<a href="Main.dc.html" style="flex: 1; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-decoration: none; color: var(--mu); font-size: 12px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>More</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { theme: this.props.theme ?? 'dark' };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TradeDesk — Order ticket</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.dark{--bg:#0E1014;--sf:#161A21;--sf2:#1D222B;--bd:#2A303B;--tx:#E8EAEE;--mu:#A0A8B6;--ac:#5B9BFF;--up:#34C77B;--dn:#FF6B6B;--live:#F5A524;--onac:#0E1014;--onlive:#0E1014;--paper:#8FA3C0;--onpaper:#0E1014;--itm:rgba(91,155,255,0.10);--scrim:rgba(0,0,0,0.6)}
+.light{--bg:#F6F7F9;--sf:#FFFFFF;--sf2:#F0F2F5;--bd:#E2E5EA;--tx:#16191F;--mu:#5B6472;--ac:#2A63C7;--up:#0B7A45;--dn:#C42F2F;--live:#9A5B00;--onac:#FFFFFF;--onlive:#FFFFFF;--paper:#4F6B8F;--onpaper:#FFFFFF;--itm:rgba(42,99,199,0.08);--scrim:rgba(16,20,28,0.45)}
+.n{font-variant-numeric:tabular-nums}
+a{color:var(--ac)}a:hover{color:var(--tx)}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--bg); color: var(--tx); font-family: Inter, system-ui, sans-serif; font-size: 14px">
+
+<div style="background: {{modeC}}; color: {{modeFg}}; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; padding: 7px 16px">{{modeBar}}</div>
+<header style="padding: 6px 8px 10px; border-bottom: 1px solid var(--bd); display: flex; align-items: center; gap: 4px">
+<a href="OptionChain.dc.html" aria-label="Close ticket" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--tx)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></a>
+<div style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 600; font-size: 16px">NIFTY 27 Oct 25850 CE</span><span class="n" style="font-size: 12px; color: var(--mu)">LTP 136.70 · bid 136.60 · ask 136.80</span></div>
+<div role="radiogroup" aria-label="Account" style="display: flex; background: var(--sf2); border-radius: 10px; padding: 3px; margin-right: 8px">
+<sc-for list="{{modes}}" as="m" hint-placeholder-count="2">
+<button role="radio" aria-checked="{{m.on}}" onClick="{{m.pick}}" style="height: 44px; min-width: 60px; border: 0; border-radius: 8px; background: {{m.bg}}; color: {{m.fg}}; font: 700 12px Inter, sans-serif">{{m.label}}</button>
+</sc-for>
+</div>
+</header>
+
+<main style="flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px">
+
+<div role="radiogroup" aria-label="Side" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{sides}}" as="s" hint-placeholder-count="2">
+<button role="radio" aria-checked="{{s.on}}" onClick="{{s.pick}}" style="height: 48px; border-radius: 10px; border: 1.5px solid {{s.border}}; background: {{s.bg}}; color: {{s.fg}}; font: 700 15px Inter, sans-serif">{{s.label}}</button>
+</sc-for>
+</div>
+
+<div style="display: flex; align-items: center; justify-content: space-between; background: var(--sf); border: 1px solid var(--bd); border-radius: 12px; padding: 8px 8px 8px 14px">
+<div><div style="font-weight: 600">Lots</div><div class="n" style="font-size: 12px; color: var(--mu)">qty {{qty}} · lot size 65</div></div>
+<div style="display: flex; align-items: center; gap: 8px">
+<button onClick="{{lotDn}}" aria-label="Fewer lots" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--bd); background: var(--sf2); color: var(--tx); font-size: 22px">−</button>
+<span class="n" style="width: 24px; text-align: center; font-size: 20px; font-weight: 700">{{lots}}</span>
+<button onClick="{{lotUp}}" aria-label="More lots" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--bd); background: var(--sf2); color: var(--tx); font-size: 22px">+</button>
+</div>
+</div>
+
+<div class="n" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<div style="background: var(--sf); border: 1px solid var(--bd); border-radius: 12px; padding: 10px 12px"><div style="font-size: 12px; color: var(--mu)">Product</div><div style="font-weight: 600">MIS · intraday</div></div>
+<div style="background: var(--sf); border: 1px solid var(--bd); border-radius: 12px; padding: 10px 12px"><div style="font-size: 12px; color: var(--mu)">Limit price</div><div style="font-weight: 600">{{price}}</div></div>
+</div>
+
+<div style="background: var(--sf); border: 1.5px solid var(--dn); border-radius: 12px; padding: 10px 8px 10px 12px; display: flex; justify-content: space-between; align-items: center">
+<div><div style="font-size: 12px; color: var(--dn); font-weight: 700">STOP LOSS · REQUIRED</div><div class="n" style="font-size: 20px; font-weight: 700">Trigger ₹{{slTrg}}</div><div class="n" style="font-size: 12px; color: var(--mu)">Limit ₹{{slLmt}} · placed at Kite after the fill</div></div>
+<div style="display: flex; gap: 6px">
+<button onClick="{{slDn}}" aria-label="Lower trigger by 5" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--bd); background: var(--sf2); color: var(--tx); font-size: 20px">−</button>
+<button onClick="{{slUp}}" aria-label="Raise trigger by 5" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--bd); background: var(--sf2); color: var(--tx); font-size: 20px">+</button>
+</div>
+</div>
+
+<div style="background: var(--sf); border: 1px solid var(--bd); border-radius: 12px; padding: 10px 12px"><div style="font-size: 12px; color: var(--mu)">Target (optional)</div><div class="n" style="font-weight: 600">{{tgt}}</div></div>
+
+<sc-if value="{{overRisk}}" hint-placeholder-val="{{ false }}">
+<label role="alert" style="display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-size: 13px; color: var(--dn); font-weight: 600"><input type="checkbox" checked="{{ack}}" onChange="{{toggleAck}}" style="width: 22px; height: 22px; flex: none; accent-color: var(--dn)">Loss at the SL limit is ₹{{maxLoss}}, above your ₹4,000 per-trade budget. I accept it.</label>
+</sc-if>
+</main>
+
+<footer style="border-top: 1px solid var(--bd); background: var(--sf); padding: 12px 16px 26px; display: flex; flex-direction: column; gap: 10px">
+<div class="n" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-size: 12px; color: var(--mu)">
+<div>Loss at SL limit<div style="font-size: 15px; font-weight: 700; color: var(--dn)">▼ −₹{{maxLoss}}</div></div>
+<div>At target<div style="font-size: 15px; font-weight: 700; color: var(--up)">▲ +₹{{gain}}</div></div>
+<div>Margin<div style="font-size: 15px; font-weight: 700; color: var(--tx)">₹{{margin}}</div></div>
+</div>
+<sc-if value="{{blocked}}" hint-placeholder-val="{{ false }}">
+<button disabled style="height: 54px; border-radius: 12px; border: 1px solid var(--bd); background: var(--sf2); color: var(--mu); font: 600 15px Inter, sans-serif">Tighten the SL or accept the risk</button>
+</sc-if>
+<sc-if value="{{showLive}}" hint-placeholder-val="{{ false }}">
+<div role="slider" aria-label="Slide to place LIVE order" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0" style="height: 54px; border-radius: 27px; background: var(--sf2); border: 1.5px solid var(--live); display: flex; align-items: center; padding: 4px; box-sizing: border-box">
+<div style="width: 46px; height: 46px; border-radius: 23px; background: var(--live); display: flex; align-items: center; justify-content: center; color: var(--onlive)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></div>
+<span style="flex: 1; text-align: center; font-weight: 600; font-size: 14px">Slide to {{sideWord}} {{lots}} lot(s) LIVE</span>
+</div>
+</sc-if>
+<sc-if value="{{showPaper}}" hint-placeholder-val="{{ true }}">
+<a href="Positions.dc.html" style="height: 54px; border-radius: 12px; background: var(--paper); color: var(--onpaper); text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px">{{sideWord}} {{lots}} lot(s) on paper</a>
+</sc-if>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { mode: 'PAPER', side: 'BUY', lots: 2, slBuy: 115, slSell: 150, ack: false }; }
+  renderVals() {
+    const st = this.state;
+    const qty = st.lots * 65;
+    const buy = st.side === 'BUY';
+    const price = buy ? 136.8 : 136.6;
+    const trg = buy ? st.slBuy : st.slSell;
+    const lmt = Math.round((buy ? trg * 0.95 : trg * 1.1) * 20) / 20;
+    const tgt = buy ? 180 : 95;
+    const loss = Math.round(Math.abs(price - lmt) * qty);
+    const gain = Math.round(Math.abs(tgt - price) * qty);
+    const fmt = (v) => v.toLocaleString('en-IN');
+    const live = st.mode === 'LIVE';
+    const over = loss > 4000;
+    const ok = !over || st.ack;
+    const key = buy ? 'slBuy' : 'slSell';
+    const step = (d) => { const n = {}; n[key] = Math.min(buy ? 135 : 300, Math.max(buy ? 20 : 140, trg + d)); n.ack = false; this.setState(n); };
+    return {
+      theme: this.props.theme ?? 'dark',
+      modeC: live ? 'var(--live)' : 'var(--paper)', modeFg: live ? 'var(--onlive)' : 'var(--onpaper)',
+      modeBar: live ? '● LIVE · real order at Kite [client ID]' : 'PAPER · simulated, nothing sent to Kite',
+      modes: ['PAPER', 'LIVE'].map((m) => ({ label: m, on: st.mode === m ? 'true' : 'false', pick: () => this.setState({ mode: m }),
+        bg: st.mode === m ? (m === 'LIVE' ? 'var(--live)' : 'var(--paper)') : 'transparent',
+        fg: st.mode === m ? (m === 'LIVE' ? 'var(--onlive)' : 'var(--onpaper)') : 'var(--mu)' })),
+      sides: ['BUY', 'SELL'].map((s) => ({ label: s, on: st.side === s ? 'true' : 'false', pick: () => this.setState({ side: s, ack: false }),
+        bg: st.side === s ? (s === 'BUY' ? 'var(--up)' : 'var(--dn)') : 'var(--sf)',
+        fg: st.side === s ? 'var(--onac)' : 'var(--mu)', border: st.side === s ? (s === 'BUY' ? 'var(--up)' : 'var(--dn)') : 'var(--bd)' })),
+      lots: st.lots, qty: qty,
+      lotDn: () => this.setState({ lots: Math.max(1, st.lots - 1), ack: false }),
+      lotUp: () => this.setState({ lots: Math.min(10, st.lots + 1), ack: false }),
+      price: (buy ? 'at ask ' : 'at bid ') + price.toFixed(2),
+      slTrg: trg.toFixed(2), slLmt: lmt.toFixed(2),
+      slDn: () => step(-5), slUp: () => step(5),
+      tgt: (buy ? 'Sell at ' : 'Buy back at ') + tgt.toFixed(2),
+      maxLoss: fmt(loss), gain: fmt(gain), overRisk: over, ack: st.ack, toggleAck: () => this.setState({ ack: !st.ack }),
+      margin: buy ? fmt(Math.round(price * qty)) : fmt(st.lots * 118000),
+      blocked: !ok, showLive: ok && live, showPaper: ok && !live, sideWord: buy ? 'Buy' : 'Sell'
+    };
+  }
+}
+</script>
+</body>
+</html>

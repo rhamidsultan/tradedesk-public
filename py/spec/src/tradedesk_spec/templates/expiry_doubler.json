@@ -1,0 +1,35 @@
+{
+  "id": "expiry_doubler",
+  "name": "Expiry-day doubler: cheap options that double (from 11:00)",
+  "version": 1,
+  "kind": "python",
+  "module": "expiry_doubler",
+  "instrument": {
+    "underlying": "NIFTY",
+    "timeframe": "1m"
+  },
+  "schedule": {
+    "days": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri"
+    ],
+    "start": "11:00",
+    "no_new_after": "15:00",
+    "exit_by": "15:15"
+  },
+  "risk": {
+    "stop_loss": {
+      "on": "premium",
+      "type": "percent",
+      "value": 60
+    },
+    "max_lots": 2,
+    "max_loss_per_day": 8000,
+    "max_trades_per_day": 6
+  },
+  "params": {},
+  "notes": "Algo Lab expiry_doubler (your rules of 18 Oct): expiry-day options \u20b95\u201330 that double from the 11:00 price; stop 20 below, trailing up to 10 behind the high; up to 3 entries per side. Broker backstop \u221260%."
+}

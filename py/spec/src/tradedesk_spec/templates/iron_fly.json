@@ -1,0 +1,37 @@
+{
+  "id": "iron_fly",
+  "name": "Iron fly (ATM straddle with wings)",
+  "version": 1,
+  "kind": "python",
+  "module": "iron_fly",
+  "instrument": {
+    "underlying": "NIFTY",
+    "timeframe": "1m"
+  },
+  "schedule": {
+    "days": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri"
+    ],
+    "start": "09:16",
+    "no_new_after": "15:00",
+    "exit_by": "15:29",
+    "hold_overnight": true,
+    "expiry_exit_time": "15:15"
+  },
+  "risk": {
+    "stop_loss": {
+      "on": "premium",
+      "type": "multiple",
+      "value": 3
+    },
+    "max_lots": 2,
+    "max_loss_per_day": 8000,
+    "max_trades_per_day": 4
+  },
+  "params": {},
+  "notes": "Algo Lab iron_fly: sells the ATM call and put, buys wings; target/stop as % of credit; regime filters (VIX band, gap, events). Short legs have a 3\u00d7 backstop at Kite; wings are hedges without stops."
+}

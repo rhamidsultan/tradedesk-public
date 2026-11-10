@@ -1,0 +1,134 @@
+# Dated Indian-market reference data. Values change: every entry carries a source and `verified`.
+# Lot sizes are keyed by contract EXPIRY date (the size applies to contracts expiring on/after `from`).
+# Live trading must read lot size and freeze quantity from the broker's instruments dump, not this file.
+
+lot_sizes:
+  NIFTY:
+    - {from: "2000-01-01", size: 50, verified: true, source: "Algo Lab config (owner)"}
+    - {from: "2024-04-26", size: 25, verified: true, source: "Algo Lab config (owner)"}
+    - {from: "2025-01-01", size: 75, verified: true, source: "Algo Lab config (owner)"}
+    - {from: "2026-01-01", size: 65, verified: true, source: "NSE revision, contracts expiring from Jan 2026"}
+  BANKNIFTY:
+    - {from: "2000-01-01", size: 15, verified: false, source: "assumption, check NSE circulars before M2"}
+    - {from: "2024-12-01", size: 30, verified: false, source: "assumption"}
+    - {from: "2025-07-01", size: 35, verified: false, source: "assumption"}
+    - {from: "2026-01-01", size: 30, verified: true, source: "NSE revision, contracts expiring from Jan 2026"}
+  FINNIFTY:
+    - {from: "2026-01-01", size: 60, verified: true, source: "NSE revision, contracts expiring from Jan 2026"}
+  MIDCPNIFTY:
+    - {from: "2026-01-01", size: 120, verified: true, source: "NSE revision, contracts expiring from Jan 2026"}
+  SENSEX:
+    - {from: "2000-01-01", size: 10, verified: false, source: "assumption"}
+    - {from: "2025-01-01", size: 20, verified: false, source: "assumption: raised during 2025, exact date unverified"}
+
+# Charges for index options at Zerodha (percent values are percent: 0.15 = 0.15%).
+# Rows are applied by trade date: a trade before `until` uses the first row it falls under; `current` after.
+# Source: owner's Algo Lab config (checked against zerodha.com/charges, Oct 2026). Verify before relying on them.
+charges_options:
+  history:
+    - {until: "2024-10-01", stt_sell_pct: 0.0625, exchange_txn_pct: 0.0495}
+    - {until: "2026-04-01", stt_sell_pct: 0.1, exchange_txn_pct: 0.03503}
+  current: {brokerage_per_order: 20, stt_sell_pct: 0.15, exchange_txn_pct: 0.03553, sebi_pct: 0.0001,
+            stamp_buy_pct: 0.003, gst_pct: 18}
+
+# Rough margin estimate for short index options (SPAN + exposure as % of spot × qty). NOT a broker number:
+# M4 replaces it with Kite's basket-margin API. A short strangle gets some offset, hence the lower combined rate.
+margin_estimate:
+  short_single_pct: 9
+  short_strangle_pct: 12
+  verified: false
+
+# Scheduled market events (for reporting results with and without them). Big gap days are found from data.
+events:
+  - {date: "2024-10-09", label: "RBI policy"}
+  - {date: "2024-12-06", label: "RBI policy"}
+  - {date: "2025-02-01", label: "Union Budget"}
+  - {date: "2025-02-07", label: "RBI policy"}
+  - {date: "2025-04-09", label: "RBI policy"}
+  - {date: "2025-06-06", label: "RBI policy"}
+  - {date: "2025-08-06", label: "RBI policy"}
+  - {date: "2025-10-01", label: "RBI policy"}
+  - {date: "2025-12-05", label: "RBI policy"}
+  - {date: "2026-02-01", label: "Union Budget"}
+  - {date: "2026-02-06", label: "RBI policy (date unverified)"}
+  - {date: "2026-04-08", label: "RBI policy (date unverified)"}
+  - {date: "2026-06-05", label: "RBI policy (date unverified)"}
+  - {date: "2026-08-07", label: "RBI policy (date unverified)"}
+  - {date: "2026-10-07", label: "RBI policy (date unverified)"}
+
+# Weekly/monthly expiry weekday (0=Mon .. 6=Sun) by date the rule took effect.
+# If the expiry weekday is a holiday the contract expires on the previous trading day.
+expiry_weekday:
+  NIFTY:
+    - {from: "2000-01-01", weekday: 3, verified: true, source: "Algo Lab config"}
+    - {from: "2025-09-01", weekday: 1, verified: true, source: "Algo Lab config"}
+  BANKNIFTY:
+    - {from: "2000-01-01", weekday: 2, verified: false, source: "weekly Wednesday until Nov 2024"}
+    - {from: "2024-11-21", weekday: 2, verified: false, source: "monthly, last Wednesday"}
+    - {from: "2025-01-01", weekday: 3, verified: false, source: "monthly, last Thursday"}
+    - {from: "2025-09-01", weekday: 1, verified: false, source: "monthly, last Tuesday"}
+  SENSEX:
+    - {from: "2000-01-01", weekday: 4, verified: false, source: "weekly Friday"}
+    - {from: "2025-01-01", weekday: 1, verified: false, source: "weekly Tuesday"}
+    - {from: "2025-09-01", weekday: 3, verified: false, source: "weekly Thursday"}
+
+# Exchange trading holidays on weekdays (NSE/BSE equity + F&O). Data-derived trading days are the
+# ground truth; this list is used to label missing days and for dates with no stored data.
+holidays:
+  - "2024-01-22"
+  - "2024-01-26"
+  - "2024-03-08"
+  - "2024-03-25"
+  - "2024-03-29"
+  - "2024-04-11"
+  - "2024-04-17"
+  - "2024-05-01"
+  - "2024-05-20"
+  - "2024-06-17"
+  - "2024-07-17"
+  - "2024-08-15"
+  - "2024-10-02"
+  - "2024-11-01"   # Diwali (Muhurat session only)
+  - "2024-11-15"
+  - "2024-11-20"
+  - "2024-12-25"
+  - "2025-02-26"
+  - "2025-03-14"
+  - "2025-03-31"
+  - "2025-04-10"
+  - "2025-04-14"
+  - "2025-04-18"
+  - "2025-05-01"
+  - "2025-08-15"
+  - "2025-08-27"
+  - "2025-10-02"
+  - "2025-10-21"   # Diwali (Muhurat session only)
+  - "2025-10-22"
+  - "2025-11-05"
+  - "2025-12-25"
+  - "2026-01-15"
+  - "2026-01-26"
+  - "2026-03-03"
+  - "2026-03-26"
+  - "2026-03-31"
+  - "2026-04-03"
+  - "2026-04-14"
+  - "2026-05-01"
+  - "2026-05-28"
+  - "2026-06-26"
+  - "2026-09-14"
+  - "2026-10-02"
+  - "2026-10-20"
+  - "2026-11-10"
+  - "2026-11-24"
+  - "2026-12-25"
+
+# Weekend dates with a full or special trading session (e.g. Budget day).
+extra_sessions:
+  - "2024-01-20"
+  - "2025-02-01"   # Budget (Saturday)
+  - "2026-02-01"   # Budget (Sunday), seen in TrueData
+
+session:
+  open: "09:15"
+  last_bar: "15:29"   # 1-minute bars are labelled by their start time

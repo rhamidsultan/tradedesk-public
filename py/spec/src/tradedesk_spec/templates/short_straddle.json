@@ -1,0 +1,37 @@
+{
+  "id": "short_straddle",
+  "name": "Positional short straddle",
+  "version": 1,
+  "kind": "python",
+  "module": "short_straddle",
+  "instrument": {
+    "underlying": "NIFTY",
+    "timeframe": "1m"
+  },
+  "schedule": {
+    "days": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri"
+    ],
+    "start": "09:16",
+    "no_new_after": "15:00",
+    "exit_by": "15:29",
+    "hold_overnight": true,
+    "expiry_exit_time": "15:15"
+  },
+  "risk": {
+    "stop_loss": {
+      "on": "premium",
+      "type": "multiple",
+      "value": 3
+    },
+    "max_lots": 2,
+    "max_loss_per_day": 8000,
+    "max_trades_per_day": 4
+  },
+  "params": {},
+  "notes": "Algo Lab short_straddle: sells the ATM straddle on the weekly expiry with its own stop and target. Undefined risk: 3\u00d7 backstop per leg at Kite."
+}

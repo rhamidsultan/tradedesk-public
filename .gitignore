@@ -1,0 +1,21 @@
+# secrets and local config
+.env
+*.env
+secrets*.yaml
+!secrets.example.yaml
+# python / node
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+dist/
+.pytest_cache/
+# market data lives outside git
+data/
+*.parquet
+*.duckdb
+# OS
+.DS_Store
+.duckdb_tmp/
+deploy/
+!apps/web/dist/

@@ -1,0 +1,45 @@
+{
+  "id": "opening_move_itm",
+  "name": "Day high/low break: ITM call or put (09:16\u201309:45, 5-pt trail)",
+  "version": 1,
+  "kind": "python",
+  "module": "opening_move_itm",
+  "instrument": {
+    "underlying": "NIFTY",
+    "timeframe": "1m"
+  },
+  "schedule": {
+    "days": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri"
+    ],
+    "start": "09:16",
+    "no_new_after": "09:46",
+    "exit_by": "15:15"
+  },
+  "risk": {
+    "stop_loss": {
+      "on": "premium",
+      "type": "points",
+      "value": 5
+    },
+    "max_lots": 2,
+    "max_loss_per_day": 8000,
+    "max_trades_per_day": 1,
+    "trailing": {
+      "type": "points",
+      "value": 5,
+      "activate_after": 0,
+      "step": 0.5
+    }
+  },
+  "params": {
+    "sl_points": 1000000.0,
+    "trail": false,
+    "lots": 1
+  },
+  "notes": "Algo Lab opening_move_itm (your rules of 22 Oct). Stop 5 points on the option, trailing 5 behind its best price \u2014 the stop at Kite follows. One trade a day; out by 15:15."
+}

@@ -1,0 +1,59 @@
+{
+  "id": "strangle_nifty",
+  "name": "NIFTY premium-matched short strangle",
+  "version": 1,
+  "instrument": {
+    "underlying": "NIFTY",
+    "timeframe": "1m"
+  },
+  "schedule": {
+    "start": "09:20",
+    "no_new_after": "09:30",
+    "exit_by": "15:29",
+    "hold_overnight": true,
+    "expiry_exit_time": "15:15"
+  },
+  "entry": {
+    "any_of": [
+      {
+        "at_time": "09:20",
+        "action": "sell_strangle"
+      }
+    ]
+  },
+  "legs": [
+    {
+      "when": "sell_strangle",
+      "side": "SELL",
+      "type": "CE",
+      "expiry": "nearest_weekly",
+      "strike": {
+        "by": "premium",
+        "value": 40
+      },
+      "lots": 1
+    },
+    {
+      "when": "sell_strangle",
+      "side": "SELL",
+      "type": "PE",
+      "expiry": "nearest_weekly",
+      "strike": {
+        "by": "premium",
+        "value": 40
+      },
+      "lots": 1
+    }
+  ],
+  "risk": {
+    "stop_loss": {
+      "on": "premium",
+      "type": "multiple",
+      "value": 2
+    },
+    "max_loss_per_day": 8000,
+    "max_trades_per_day": 1,
+    "close_lone_leg_eod": true
+  },
+  "notes": "v0 without the roll rule. Enters when flat; a leg left alone after its pair stops is closed at 15:25; exits each leg at 2x premium or on expiry day at 15:15. Overnight gap risk is not capped (owner chose no wings)."
+}

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TradeDesk — Exit or modify SL</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.dark{--bg:#0E1014;--sf:#161A21;--sf2:#1D222B;--bd:#2A303B;--tx:#E8EAEE;--mu:#A0A8B6;--ac:#5B9BFF;--up:#34C77B;--dn:#FF6B6B;--live:#F5A524;--onac:#0E1014;--onlive:#0E1014;--paper:#8FA3C0;--onpaper:#0E1014;--itm:rgba(91,155,255,0.10);--scrim:rgba(0,0,0,0.6)}
+.light{--bg:#F6F7F9;--sf:#FFFFFF;--sf2:#F0F2F5;--bd:#E2E5EA;--tx:#16191F;--mu:#5B6472;--ac:#2A63C7;--up:#0B7A45;--dn:#C42F2F;--live:#9A5B00;--onac:#FFFFFF;--onlive:#FFFFFF;--paper:#4F6B8F;--onpaper:#FFFFFF;--itm:rgba(42,99,199,0.08);--scrim:rgba(16,20,28,0.45)}
+.n{font-variant-numeric:tabular-nums}
+a{color:var(--ac)}a:hover{color:var(--tx)}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-end; background: var(--scrim); color: var(--tx); font-family: Inter, system-ui, sans-serif; font-size: 14px">
+<a href="Positions.dc.html" aria-label="Close" style="flex: 1"></a>
+<section role="dialog" aria-label="Exit or modify stop loss, LIVE" style="background: var(--sf); border-radius: 20px 20px 0 0; border-top: 6px solid var(--live); padding: 10px 16px 28px; display: flex; flex-direction: column; gap: 14px">
+<div style="width: 40px; height: 5px; border-radius: 3px; background: var(--bd); align-self: center"></div>
+<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px">
+<div><div style="font-size: 17px; font-weight: 700">NIFTY 27 Oct 26300 CE</div><div class="n" style="font-size: 12px; color: var(--mu)">Short −130 (2 lots) · NRML · avg 42.50 · LTP 31.20</div></div>
+<span style="font-size: 12px; font-weight: 700; color: var(--onlive); background: var(--live); border-radius: 4px; padding: 3px 8px; flex: none">LIVE</span>
+</div>
+
+<div role="tablist" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: var(--sf2); border-radius: 10px; padding: 3px">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="2">
+<button role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="height: 44px; border: 1.5px solid {{t.border}}; border-radius: 8px; background: {{t.bg}}; color: {{t.fg}}; font: 600 14px Inter, sans-serif">{{t.label}}</button>
+</sc-for>
+</div>
+
+<sc-if value="{{isExit}}" hint-placeholder-val="{{ true }}">
+<div class="n" style="display: flex; flex-direction: column; font-size: 13px">
+<div style="display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--bd)"><span style="color: var(--mu)">Order</span><span style="font-weight: 600"><span style="color: var(--up)">BUY</span> to close · 130 (2 lots)</span></div>
+<div style="display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--bd)"><span style="color: var(--mu)">Price</span><span>LIMIT at ask 31.25 · re-price ≤ 30 s</span></div>
+<div style="display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--bd)"><span style="color: var(--mu)">Then</span><span>Cancel SL order trg 127.50</span></div>
+<div style="display: flex; justify-content: space-between; padding: 12px 0 4px"><span style="color: var(--mu)">P&amp;L if filled now</span><span style="font-size: 18px; font-weight: 700; color: var(--up)">▲ +₹1,463</span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{isMod}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between; background: var(--sf2); border-radius: 12px; padding: 8px">
+<button onClick="{{dec}}" aria-label="Lower SL trigger by 5" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--bd); background: var(--sf); color: var(--tx); font-size: 22px">−</button>
+<div class="n" style="text-align: center"><div style="font-size: 12px; color: var(--mu)">SL trigger (option price)</div><div style="font-size: 24px; font-weight: 700">₹{{trg}}</div><div style="font-size: 12px; color: var(--mu)">limit ₹{{lmt}} · was ₹127.50</div></div>
+<button onClick="{{inc}}" aria-label="Raise SL trigger by 5" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--bd); background: var(--sf); color: var(--tx); font-size: 22px">+</button>
+</div>
+<div class="n" style="display: flex; justify-content: space-between; font-size: 13px"><span style="color: var(--mu)">Loss if it fills at the limit</span><span style="font-size: 18px; font-weight: 700; color: var(--dn)">▼ −₹{{newLoss}}</span></div>
+<div class="n" style="font-size: 12px; color: var(--mu)">Was ▼ −₹12,708 · change {{delta}} · more if it doesn't fill</div>
+</div>
+</sc-if>
+
+<div role="slider" aria-label="{{slideLabel}}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0" style="height: 54px; border-radius: 27px; background: var(--sf2); border: 1.5px solid var(--live); display: flex; align-items: center; padding: 4px; box-sizing: border-box">
+<div style="width: 46px; height: 46px; border-radius: 23px; background: var(--live); display: flex; align-items: center; justify-content: center; color: var(--onlive)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></div>
+<span style="flex: 1; text-align: center; font-weight: 600; font-size: 14px">{{slideLabel}}</span>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { tab: 'Exit', trg: 127.5 }; }
+  renderVals() {
+    const st = this.state;
+    const lmtV = Math.ceil(st.trg * 1.1 * 20) / 20;
+    const loss = Math.round((lmtV - 42.5) * 130);
+    const d = loss - 12708;
+    const fmt = (v) => v.toLocaleString('en-IN');
+    return {
+      theme: this.props.theme ?? 'dark',
+      tabs: ['Exit', 'Modify SL'].map((t) => ({ label: t, on: st.tab === t ? 'true' : 'false', pick: () => this.setState({ tab: t }),
+        bg: st.tab === t ? 'var(--sf)' : 'transparent', border: st.tab === t ? 'var(--ac)' : 'transparent', fg: st.tab === t ? 'var(--ac)' : 'var(--mu)' })),
+      isExit: st.tab === 'Exit', isMod: st.tab === 'Modify SL',
+      trg: st.trg.toFixed(2), lmt: (Math.ceil(st.trg * 1.1 * 20) / 20).toFixed(2),
+      dec: () => this.setState({ trg: Math.max(35, st.trg - 5) }),
+      inc: () => this.setState({ trg: st.trg + 5 }),
+      newLoss: fmt(loss),
+      delta: d === 0 ? 'none' : (d < 0 ? 'risk ▼ ₹' + fmt(-d) + ' less' : 'risk ▲ ₹' + fmt(d) + ' more'),
+      slideLabel: st.tab === 'Exit' ? 'Slide to exit LIVE' : 'Slide to modify LIVE SL'
+    };
+  }
+}
+</script>
+</body>
+</html>

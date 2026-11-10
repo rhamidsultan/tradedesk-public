@@ -1,0 +1,37 @@
+{
+  "id": "blaze_butterfly",
+  "name": "Blaze butterfly (put broken-wing)",
+  "version": 1,
+  "kind": "python",
+  "module": "blaze_butterfly",
+  "instrument": {
+    "underlying": "NIFTY",
+    "timeframe": "1m"
+  },
+  "schedule": {
+    "days": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri"
+    ],
+    "start": "09:16",
+    "no_new_after": "15:00",
+    "exit_by": "15:29",
+    "hold_overnight": true,
+    "expiry_exit_time": "15:15"
+  },
+  "risk": {
+    "stop_loss": {
+      "on": "premium",
+      "type": "multiple",
+      "value": 3
+    },
+    "max_lots": 2,
+    "max_loss_per_day": 8000,
+    "max_trades_per_day": 4
+  },
+  "params": {},
+  "notes": "Algo Lab blaze_butterfly (Tradetron spec): NIFTY put broken-wing butterfly with its own exits. Short legs 3\u00d7 backstop at Kite; long legs are hedges."
+}

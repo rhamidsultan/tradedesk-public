@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TradeDesk — Deploy to paper</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.dark{--bg:#0E1014;--sf:#161A21;--sf2:#1D222B;--bd:#2A303B;--tx:#E8EAEE;--mu:#A0A8B6;--ac:#5B9BFF;--up:#34C77B;--dn:#FF6B6B;--live:#F5A524;--onac:#0E1014;--onlive:#0E1014;--paper:#8FA3C0;--onpaper:#0E1014;--itm:rgba(91,155,255,0.10);--scrim:rgba(0,0,0,0.6)}
+.light{--bg:#F6F7F9;--sf:#FFFFFF;--sf2:#F0F2F5;--bd:#E2E5EA;--tx:#16191F;--mu:#5B6472;--ac:#2A63C7;--up:#0B7A45;--dn:#C42F2F;--live:#9A5B00;--onac:#FFFFFF;--onlive:#FFFFFF;--paper:#4F6B8F;--onpaper:#FFFFFF;--itm:rgba(42,99,199,0.08);--scrim:rgba(16,20,28,0.45)}
+.n{font-variant-numeric:tabular-nums}
+a{color:var(--ac)}a:hover{color:var(--tx)}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-end; background: var(--scrim); color: var(--tx); font-family: Inter, system-ui, sans-serif; font-size: 14px">
+<a href="Templates.dc.html" aria-label="Close" style="flex: 1"></a>
+<section role="dialog" aria-label="Start paper trading" style="background: var(--sf); border-radius: 20px 20px 0 0; border-top: 6px solid var(--paper); padding: 10px 16px 28px; display: flex; flex-direction: column; gap: 14px">
+<div style="width: 40px; height: 5px; border-radius: 3px; background: var(--bd); align-self: center"></div>
+<div style="display: flex; justify-content: space-between; align-items: center">
+<div><div style="font-size: 18px; font-weight: 700">Opening range breakout</div><div style="font-size: 12px; color: var(--mu)">NIFTY options · 5 min · v3 defaults</div></div>
+<span style="font-size: 12px; font-weight: 700; color: var(--onpaper); background: var(--paper); border-radius: 4px; padding: 3px 8px">PAPER</span>
+</div>
+<div style="font-size: 13px; color: var(--paper); font-weight: 600">Simulated orders only. Nothing is sent to Kite.</div>
+
+<div class="n" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<div style="background: var(--sf2); border-radius: 10px; padding: 10px"><div style="font-size: 12px; color: var(--mu)">Max loss / trade</div><div style="font-size: 18px; font-weight: 700; color: var(--dn)">▼ ≈−₹1,950</div></div>
+<div style="background: var(--sf2); border-radius: 10px; padding: 10px"><div style="font-size: 12px; color: var(--mu)">Stops for the day at</div><div style="font-size: 18px; font-weight: 700; color: var(--dn)">▼ −₹4,000</div></div>
+</div>
+
+<div class="n" style="display: flex; flex-direction: column; font-size: 13px">
+<div style="display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--bd)"><span style="color: var(--mu)">Size</span><span>130 (2 lots) · from ₹2,000 risk</span></div>
+<div style="display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--bd)"><span style="color: var(--mu)">Stop loss</span><span>30 pts on NIFTY spot</span></div>
+<div style="display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--bd)"><span style="color: var(--mu)">Target</span><span>1:2 · trail after 1R</span></div>
+<div style="display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--bd)"><span style="color: var(--mu)">Hours</span><span>09:30–14:30 · exit by 15:15</span></div>
+<div style="display: flex; justify-content: space-between; padding: 9px 0"><span style="color: var(--mu)">Backtest (2023–26)</span><span>▲ +₹1.85 L · DD −11.2% · 412 trades</span></div>
+</div>
+
+<a href="Main.dc.html" style="height: 52px; border-radius: 12px; background: var(--paper); color: var(--onpaper); text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px">Start paper trading</a>
+<div style="font-size: 12px; color: var(--mu); text-align: center">Live unlocks after 20 paper trades inside the backtest range.</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { theme: this.props.theme ?? 'dark' };
+  }
+}
+</script>
+</body>
+</html>
