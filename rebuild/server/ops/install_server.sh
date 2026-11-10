@@ -95,7 +95,11 @@ else
 fi
 
 say "Market data (a copy; the old TradeDesk store is only read)"
-if [ ! -d $ROOT/store/bars_1m ] && [ -d /opt/tradedesk/store/bars_1m ]; then
+STORE_GB=0; [ -d /opt/tradedesk/store ] && STORE_GB=$(sudo du -s --block-size=1G /opt/tradedesk/store | cut -f1)
+FREE_GB=$(df -BG --output=avail / | tail -1 | tr -dc 0-9)
+if [ ! -d $ROOT/store/bars_1m ] && [ -d /opt/tradedesk/store/bars_1m ] && [ $((STORE_GB + 3)) -gt "$FREE_GB" ]; then
+  echo "  the store is ${STORE_GB} GB and only ${FREE_GB} GB is free: not copied (the app shows 'no data' until it is)"
+elif [ ! -d $ROOT/store/bars_1m ] && [ -d /opt/tradedesk/store/bars_1m ]; then
   sudo rsync -a --exclude runs /opt/tradedesk/store/ $ROOT/store/ && sudo chown -R tradedesk:tradedesk $ROOT/store
   echo "  copied $(sudo du -sh $ROOT/store | cut -f1) from /opt/tradedesk/store"
 elif [ -d $ROOT/store/bars_1m ]; then echo "  already here ($(sudo du -sh $ROOT/store | cut -f1))"
