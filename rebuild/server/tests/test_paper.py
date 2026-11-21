@@ -249,7 +249,11 @@ def test_results_exclusions_scrub_compare_and_weekly_report(client, owner, paper
     sc = client.get(f"/v1/paper/sessions/{s['id']}/scrub?day=2026-11-03&minute=45", headers=h).json()
     assert sc["as_of"] == "10:01" and len(sc["positions"]) == 2
     sc2 = client.get(f"/v1/paper/sessions/{s['id']}/scrub?day=2026-11-03&minute=80", headers=h).json()
-    assert not sc2["positions"]
+    assert not sc2["positions"] and "pnl" not in sc2
+    cv = client.get(f"/v1/paper/sessions/{s['id']}/scrub?day=2026-11-03&minute=45&curve=true", headers=h).json()
+    assert cv["index"] and cv["pnl"] and cv["pnl"][0]["ts"].startswith("2026-11-03 09:")
+    at45 = next(x["pnl"] for x in cv["pnl"] if x["m"] == 45)
+    assert at45 == sc["day_pnl"]                                           # the chart and the figure agree
     assert client.get(f"/v1/paper/sessions/{s['id']}/scrub?day=2026-11-04&minute=10", headers=h).status_code == 404
     with paper.sessions() as db:
         assert db.query(Alert).filter(Alert.title.like("Paper week%")).count() == 1

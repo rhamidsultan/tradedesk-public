@@ -90,8 +90,10 @@ class PaperEngine:
         self.today = None
         self._save()
 
-    def scrub(self, day: DayData, minute: int, act: dict, start_minute: int, rules: dict) -> dict | None:
-        """The session as it stood at the end of `minute` on a booked day (None if that day is not kept)."""
+    def scrub(self, day: DayData, minute: int, act: dict, start_minute: int, rules: dict,
+              curve: bool = False) -> dict | None:
+        """The session as it stood at the end of `minute` on a booked day (None if that day is not kept).
+        curve: also the whole day's index and P&L each minute (closed + open, after charges), for the chart."""
         f = self.dir / "days" / f"{day.date}.pkl"
         if not f.exists():
             return None
@@ -102,7 +104,18 @@ class PaperEngine:
         bt._run_day(day, until=minute + 1)
         view = PaperEngine.__new__(PaperEngine)
         view.dir, view.base, view.today, view.stop_events = self.dir, before, bt, []
-        return view.state(day.date, rules, until=minute + 1)
+        out = view.state(day.date, rules, until=minute + 1)
+        if curve:
+            whole = copy.deepcopy(before)
+            self._apply(whole, act, start_minute)
+            whole.curve = []
+            whole._run_day(day)
+            stamp = lambda m: f"{day.date} {(555 + m) // 60:02d}:{(555 + m) % 60:02d}:00"   # bar start, IST
+            out["pnl"] = [{"m": m, "ts": stamp(m), "pnl": v} for _, m, v in whole.curve]
+            s = day.spot
+            out["index"] = [] if s is None else \
+                [{"m": int(m), "ts": stamp(int(m)), "c": float(c)} for m, c, g in zip(s.m, s.c, s.good) if g]
+        return out
 
     def kept_days(self) -> list[str]:
         return sorted(p.stem for p in (self.dir / "days").glob("*.pkl"))
