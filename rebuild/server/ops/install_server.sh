@@ -15,7 +15,8 @@ case "$IP" in *[!0-9.]*|"") echo "TD2_IP is not an IP address"; exit 1 ;; esac
 HOST="td2.${IP//./-}.sslip.io"
 ROOT=/opt/td2; APP=$ROOT/app; VENV=$ROOT/venv; ENVF=$ROOT/secrets/td2.env
 say() { printf '\n==> %s\n' "$*"; }
-as_td() { sudo -u tradedesk -H "$@"; }
+# from / : run in the ssh login's home (which tradedesk cannot read), pip stats a relative sys.path entry and fails
+as_td() { (cd / && sudo -u tradedesk -H "$@"); }
 
 say "Checking the server"
 . /etc/os-release; echo "  $PRETTY_NAME"
