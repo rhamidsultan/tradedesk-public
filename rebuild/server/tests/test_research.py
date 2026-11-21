@@ -267,11 +267,13 @@ def test_backtest_uses_stored_1_second_bars_and_checks_them_against_the_minute(c
     got = client.get(f"/v1/research/backtests/{run['id']}", headers=h).json()
     assert got["status"] == "done", got["note"]
     assert got["audit"]["seconds"]["days"] == 1 and got["audit"]["seconds"]["exits_settled"] == 1
+    assert got["audit"]["exit_model"].startswith("premium stops on 1-second")
     stop = next(f for t in client.get(f"/v1/research/backtests/{run['id']}/trades", headers=h).json()["trades"]
                 for f in t["fills"] if f["reason"] == "stop_loss")
     assert stop["ts"] == "2026-10-12 10:55:30"
     chk = got["seconds_check"]
     assert chk["days"] == 1 and chk["from"] == "2026-10-12" and chk["days_different"] == 1
+    assert chk["net_1s"] - chk["net_1m"] == pytest.approx(chk["diff"]) and not chk["rows"][0]["diverged"]
     row = chk["rows"][0]
     ch = row["changed_exits"][0]
     assert ch["minute"]["ts"].endswith("10:55:00") and ch["second"]["ts"].endswith("10:55:30")

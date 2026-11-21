@@ -85,6 +85,8 @@ class Seconds:
     h: np.ndarray
     l: np.ndarray
     c: np.ndarray
+    bid: np.ndarray          # best bid / ask at the end of the second (NaN where not stored)
+    ask: np.ndarray
 
     def in_minute(self, m: int) -> range:
         """Bar indexes inside minute m (09:15 + m), in time order."""
@@ -188,16 +190,18 @@ class StoreFeed:
             if self.seconds else []
         if sec_files:
             files = [str(f) for f in sec_files]
+            cols = {r[0] for r in self.con.execute(f"DESCRIBE SELECT * FROM read_parquet({files}, union_by_name=true)").fetchall()}
+            q = ", ".join(x if x in cols else f"NULL AS {x}" for x in ("bid", "ask"))
 
             def load_sec(symbol: str) -> Seconds | None:
                 rows = self.con.execute(
-                    f"SELECT ts, open, high, low, close FROM read_parquet({files}) WHERE symbol = ? ORDER BY ts",
-                    [symbol]).fetchall()
+                    f"SELECT ts, open, high, low, close, {q} FROM read_parquet({files}, union_by_name=true) "
+                    f"WHERE symbol = ? ORDER BY ts", [symbol]).fetchall()
                 if not rows:
                     return None
                 t0 = datetime.combine(d, T0)
                 t = np.array([int((r[0] - t0).total_seconds()) for r in rows], dtype=np.int32)
-                a = np.array([r[1:5] for r in rows], dtype=float)
-                return Seconds(t, a[:, 0], a[:, 1], a[:, 2], a[:, 3])
+                a = np.array([[np.nan if v is None else v for v in r[1:7]] for r in rows], dtype=float)
+                return Seconds(t, a[:, 0], a[:, 1], a[:, 2], a[:, 3], a[:, 4], a[:, 5])
             dd.sec_loader = load_sec
         return dd

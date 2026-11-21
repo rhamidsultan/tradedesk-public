@@ -221,9 +221,9 @@ struct ResultView: View {
             if let s = a.seconds {
                 row("Days with 1-second bars", "\(s.days) of \(s.ofDays)")
                 if s.days > 0 {
-                    row("Stops and targets settled on seconds", "\(s.exitsSettled)")
-                    if s.targetBeforeStop > 0 { row("Target reached before the stop", "\(s.targetBeforeStop)") }
-                    if s.minutesOn1mRule > 0 { row("Minutes on the 1-minute rule", "\(s.minutesOn1mRule)") }
+                    row("Stops settled on seconds", "\(s.exitsSettled)")
+                    if s.stopNotYetHeld > 0 { row("Touches before the broker held the stop", "\(s.stopNotYetHeld)") }
+                    if s.minutesOn1mRule > 0 { row("Minutes on the 1-minute rule (seconds incomplete)", "\(s.minutesOn1mRule)") }
                 }
             }
         }
@@ -234,6 +234,7 @@ struct ResultView: View {
                 row("Oldest trade a fill may use", a.fillModel.fillMaxAgeMin.map { "\($0) min" })
                 row("Cost stress", a.fillModel.costStress.map { "× \($0.formatted())" })
             }
+            if let e = a.exitModel { row("Stops checked on", e) }
             row("Stop order", a.fillModel.slOrder.map { $0 == "limit" ? "SL-limit (may stay unfilled)" : "Assumed to fill" })
             ForEach(a.lotSizesByExpiry.keys.sorted(), id: \.self) { e in
                 row("Lot size, expiry \(Fmt.marketDay(e))", (a.lotSizesByExpiry[e] ?? nil).map { "\($0)" })
@@ -417,7 +418,10 @@ struct SecondsCheckSection: View {
         let rows = k(check, "rows")?.array ?? []
         Section {
             LabeledContent("Net on 1-minute bars", value: Fmt.rupees(k(check, "net_1m")?.number ?? 0, hidden: hide, signed: true))
-            LabeledContent("Net with 1-second exits", value: Fmt.rupees(k(check, "net_1s")?.number ?? 0, hidden: hide, signed: true))
+            if let e = k(check, "error")?.string {
+                Label("The check could not run: \(e)", systemImage: "exclamationmark.triangle").font(.caption)
+            }
+            LabeledContent("Net with 1-second stops", value: Fmt.rupees(k(check, "net_1s")?.number ?? 0, hidden: hide, signed: true))
             let diff = k(check, "diff")?.number ?? 0
             LabeledContent("Difference") {
                 Text(Fmt.rupees(diff, hidden: hide, signed: true))
@@ -426,7 +430,13 @@ struct SecondsCheckSection: View {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, r in
                 let changed = k(r, "changed_exits")?.array ?? []
                 DisclosureGroup {
-                    if changed.isEmpty { Text("Same exits both ways.").font(.caption).foregroundStyle(.secondary) }
+                    if k(r, "diverged")?.bool == true {
+                        Text("Different trades: an earlier exit changed what was held, so exits are not paired.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else if changed.isEmpty {
+                        Text(k(r, "has_seconds")?.bool == false ? "No 1-second bars this day; same exits."
+                             : "Same exits both ways.").font(.caption).foregroundStyle(.secondary)
+                    }
                     ForEach(Array(changed.enumerated()), id: \.offset) { _, x in
                         VStack(alignment: .leading, spacing: 2) {
                             Text(Fmt.contract(k(x, "symbol")?.string ?? "")).font(.caption.weight(.semibold))
@@ -451,7 +461,7 @@ struct SecondsCheckSection: View {
         } header: {
             Text("1-minute vs 1-second (\(Int(k(check, "days")?.number ?? 0)) days)")
         } footer: {
-            Text("The days with 1-second bars, run on the 1-minute rule and with 1-second stops and targets. "
+            Text("From the first day with 1-second bars, run on the 1-minute rule and with stops settled on seconds. "
                  + (k(check, "note")?.string ?? ""))
         }
     }

@@ -26,9 +26,9 @@ def _set(d: dict, path: str, v):
         cur[keys[-1]] = v
 
 
-def _run(raw, store, start, end):
+def _run(raw, store, start, end, seconds=False):
     st = Strategy.model_validate(raw)
-    res = Backtest(st, StoreFeed(store, st.instrument.underlying)).run(start, end)
+    res = Backtest(st, StoreFeed(store, st.instrument.underlying, seconds=seconds)).run(start, end)
     m = summarise(res, st.costs.capital)
     return {k: m.get(k) for k in ("net_pnl", "max_drawdown", "win_rate_pct", "trades", "months_profitable_pct",
                                   "score_steady", "charges", "sortino", "calmar")}
@@ -46,7 +46,8 @@ def _score(r) -> float:
     return r["score_steady"] if r["score_steady"] is not None else (-1e9 if (r["net_pnl"] or 0) <= 0 else 0)
 
 
-def run_sweep(spec: dict, grid: dict, start: date, split: date, end: date, store, folds: int = 0, progress=None) -> dict:
+def run_sweep(spec: dict, grid: dict, start: date, split: date, end: date, store, folds: int = 0, progress=None,
+              seconds: bool = False) -> dict:
     cs = combos(grid)
     total = len(cs) + 3 + (folds * len(cs) if folds else 0)
     done = 0
@@ -63,7 +64,7 @@ def run_sweep(spec: dict, grid: dict, start: date, split: date, end: date, store
         for k, v in c.items():
             _set(raw, k, v)
         try:
-            r = _run(raw, store, start, split)
+            r = _run(raw, store, start, split, seconds)
         except Exception as e:
             r = {"error": str(e)[:200], "net_pnl": None, "score_steady": None}
         rows.append({"params": c, "in_sample": r})
@@ -74,7 +75,7 @@ def run_sweep(spec: dict, grid: dict, start: date, split: date, end: date, store
         raw = copy.deepcopy(spec)
         for k, v in x["params"].items():
             _set(raw, k, v)
-        x["out_of_sample"] = _run(raw, store, split + timedelta(days=1), end)
+        x["out_of_sample"] = _run(raw, store, split + timedelta(days=1), end, seconds)
         tick()
     wf = []
     if folds:
@@ -87,7 +88,7 @@ def run_sweep(spec: dict, grid: dict, start: date, split: date, end: date, store
                 for k, v in c.items():
                     _set(raw, k, v)
                 try:
-                    r = _run(raw, store, a, b)
+                    r = _run(raw, store, a, b, seconds)
                 except Exception:
                     continue
                 if _score(r) > best_s:
@@ -97,7 +98,7 @@ def run_sweep(spec: dict, grid: dict, start: date, split: date, end: date, store
                 raw = copy.deepcopy(spec)
                 for k, v in best.items():
                     _set(raw, k, v)
-                nxt = _run(raw, store, b + timedelta(days=1), c2)
+                nxt = _run(raw, store, b + timedelta(days=1), c2, seconds)
                 wf.append({"train": [str(a), str(b)], "test": [str(b + timedelta(days=1)), str(c2)], "params": best, "test_result": nxt})
     n = len(cs)
     luck = (f"Best of {n} combinations: some of its in-sample result is luck. Trust the out-of-sample column and prefer "

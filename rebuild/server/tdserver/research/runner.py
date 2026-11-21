@@ -78,7 +78,10 @@ def run_one(ctx: AppContext, run_id: int) -> str:
             "audit": _audit(strat, res, days, start, end),
         }
         if ctx.settings.backtest_seconds:
-            check = seconds_check(store, strat, days)
+            try:
+                check = seconds_check(store, strat, days)
+            except Exception as e:  # noqa: BLE001 — the check must never fail a finished backtest
+                check = {"error": f"{type(e).__name__}: {str(e)[:150]}"}
             if check:
                 out["seconds_check"] = check
         result_path(ctx, run_id).write_bytes(gzip.compress(json.dumps(out, default=str).encode()))
@@ -116,8 +119,9 @@ def second_days(store, underlying: str) -> list[date]:
 
 
 def seconds_check(store, strat, days: list[date]) -> dict | None:
-    """The C check: the days that have 1-second bars, run on the 1-minute rule and on 1-second exits, both from
-    flat on the first such day, day by day: net P&L and each exit (reason, time, price) side by side."""
+    """The C check: from the first day that has 1-second bars to the end, run on the 1-minute rule and with 1-second
+    stops, both from flat; per day the net P&L both ways and the exits that differ, matched by trade (entry time) and
+    leg. Once the two runs hold different trades, the day is marked as diverged instead of pairing unlike exits."""
     from tradedesk_engine import Backtest
     from tradedesk_engine.data import StoreFeed
     have = set(second_days(store, strat.instrument.underlying))
@@ -130,35 +134,44 @@ def seconds_check(store, strat, days: list[date]) -> dict | None:
     net1, net2 = dict(m1.daily), dict(s1.daily)
 
     def exits(res, day):
-        by: dict[str, list] = {}
+        entry = {t.trade_id: t.entry_ts for t in res.trades}
+        out, n = {}, {}
         for f in res.fills:
             if f.reason != "entry" and f.ts.startswith(day):
-                by.setdefault(f.symbol, []).append(f)
-        return by
+                k = (entry.get(f.trade_id, ""), f.symbol)
+                n[k] = n.get(k, 0) + 1
+                out[(*k, n[k])] = f
+        return out
+
+    def trades_on(res, day):
+        return {t.entry_ts for t in res.trades if t.entry_ts[:10] <= day and (not t.exit_ts or t.exit_ts[:10] >= day)}
 
     rows = []
-    for d in sec_days:
+    for d in [x for x in days if a <= x <= b]:
         k = str(d)
+        n1, n2 = round(net1.get(k, 0.0), 2), round(net2.get(k, 0.0), 2)
         e1, e2 = exits(m1, k), exits(s1, k)
+        diverged = trades_on(m1, k) != trades_on(s1, k)
         pairs = []
-        for sym in sorted(set(e1) | set(e2)):
-            x, y = e1.get(sym, []), e2.get(sym, [])
-            for i in range(max(len(x), len(y))):
-                f, g = (x[i] if i < len(x) else None), (y[i] if i < len(y) else None)
-                same = f and g and (f.reason, f.ts, f.price) == (g.reason, g.ts, g.price)
-                if not same:
-                    pairs.append({"symbol": sym,
+        if not diverged:
+            for key in sorted(set(e1) | set(e2)):
+                f, g = e1.get(key), e2.get(key)
+                if not (f and g and (f.reason, f.ts, f.price) == (g.reason, g.ts, g.price)):
+                    pairs.append({"symbol": key[1], "entry": key[0],
                                   "minute": {"reason": f.reason, "ts": f.ts, "price": f.price} if f else None,
                                   "second": {"reason": g.reason, "ts": g.ts, "price": g.price} if g else None})
-        n1, n2 = round(net1.get(k, 0.0), 2), round(net2.get(k, 0.0), 2)
-        rows.append({"date": k, "net_1m": n1, "net_1s": n2, "diff": round(n2 - n1, 2),
-                     "stops_1m": sum(1 for v in e1.values() for f in v if f.reason == "stop_loss"),
-                     "stops_1s": sum(1 for v in e2.values() for f in v if f.reason == "stop_loss"),
-                     "changed_exits": pairs})
-    t1, t2 = round(sum(r["net_1m"] for r in rows), 2), round(sum(r["net_1s"] for r in rows), 2)
-    return {"from": str(a), "days": len(rows), "net_1m": t1, "net_1s": t2, "diff": round(t2 - t1, 2),
-            "days_different": sum(1 for r in rows if r["diff"] or r["changed_exits"]), "rows": rows,
-            "note": "Both runs start with no positions on the first day that has 1-second bars."}
+        if d not in have and n1 == n2 and not pairs:
+            continue                                         # a day without seconds where nothing differs
+        rows.append({"date": k, "has_seconds": d in have, "net_1m": n1, "net_1s": n2, "diff": round(n2 - n1, 2),
+                     "stops_1m": sum(1 for f in e1.values() if f.reason == "stop_loss"),
+                     "stops_1s": sum(1 for f in e2.values() if f.reason == "stop_loss"),
+                     "diverged": diverged, "changed_exits": pairs})
+    t1 = round(sum(x for dd, x in net1.items() if a <= date.fromisoformat(dd) <= b), 2)
+    t2 = round(sum(x for dd, x in net2.items() if a <= date.fromisoformat(dd) <= b), 2)
+    return {"from": str(a), "to": str(b), "days": len(sec_days), "net_1m": t1, "net_1s": t2, "diff": round(t2 - t1, 2),
+            "days_different": sum(1 for r in rows if r["diff"] or r["changed_exits"] or r["diverged"]), "rows": rows,
+            "note": "Both runs start with no positions on the first day that has 1-second bars; totals cover every day "
+                    "from then. 'Different trades' means an earlier exit changed what was held, so exits are not paired."}
 
 
 HEADLINE = ("net_pnl", "gross_pnl", "charges", "charges_pct_of_gross", "trades", "win_rate_pct", "max_drawdown",
@@ -219,9 +232,10 @@ def _audit(strat, res, days, start, end) -> dict:
         "lot_sizes_by_expiry": lots,
         "charges_rates": charge_rates,
         "skipped": {k: v for k, v in d.items() if k.startswith("entry_skipped") and v},
+        "exit_model": "premium stops on 1-second bars where stored" if d.get("days_with_seconds") else "1-minute bars",
         "seconds": {"days": d.get("days_with_seconds", 0), "of_days": len(days),
-                    "exits_settled": d.get("sec_exits", 0), "target_before_stop": d.get("sec_target_before_stop", 0),
-                    "minutes_on_1m_rule": d.get("sec_fallback_minutes", 0) + d.get("sec_no_touch", 0)},
+                    "exits_settled": d.get("sec_exits", 0), "stop_not_yet_held": d.get("sec_stop_not_yet_held", 0),
+                    "minutes_on_1m_rule": d.get("sec_fallback_minutes", 0)},
         "engine_version": ENGINE_VERSION,
         "spec_hash": hashlib.sha256(json.dumps(strat.model_dump(mode="json"), sort_keys=True).encode()).hexdigest()[:12],
     }
@@ -262,7 +276,8 @@ def _run_sweep(ctx: AppContext, run_id: int, spec: dict, start, end, params: dic
         store = Store(ctx.settings.store_root, memory_limit=f"{ctx.settings.backtest_duckdb_mb}MB", threads=1)
         grid = params["grid"]
         split = _date.fromisoformat(params["split"])
-        res = sw.run_sweep(spec, grid, start, split, end, store, folds=int(params.get("folds") or 0), progress=progress)
+        res = sw.run_sweep(spec, grid, start, split, end, store, folds=int(params.get("folds") or 0), progress=progress,
+                           seconds=ctx.settings.backtest_seconds)
         ok = [r for r in res["rows"] if "error" not in r["in_sample"]]
         # plateau: a setting whose neighbours lose is fragile, however good it looks alone
         for r in ok:
