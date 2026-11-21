@@ -1,6 +1,9 @@
 """FastAPI application. Run with `uvicorn --factory tdserver.app:create_app` (settings from TD2_ variables)."""
 from __future__ import annotations
 
+import logging
+import secrets
+
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -27,6 +30,8 @@ from .settings import get_settings
 from .status import router as status_router
 from .tools.routes import jrouter as journal_router
 from .tools.routes import router as tools_router
+
+log = logging.getLogger("tdserver.api")
 
 STATIC = Path(__file__).parent / "console" / "static"
 
@@ -72,7 +77,11 @@ def create_app(ctx: AppContext | None = None) -> FastAPI:
 
     @app.exception_handler(Exception)
     async def unhandled(request: Request, exc: Exception):  # never echo internals (could hold secrets)
-        return JSONResponse({"detail": "Something went wrong on the server."}, status_code=500)
+        ref = secrets.token_hex(3).upper()
+        log.error("unhandled %s %s ref=%s", request.method, request.url.path, ref, exc_info=exc)
+        # the kind of error and a reference to find it in the server log (journalctl -u td2-api | grep ref=...)
+        return JSONResponse({"detail": f"Something went wrong on the server ({type(exc).__name__}, ref {ref})."},
+                            status_code=500)
 
     return app
 
