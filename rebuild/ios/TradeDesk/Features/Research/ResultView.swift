@@ -221,7 +221,7 @@ struct ResultView: View {
             if let s = a.seconds {
                 row("Days with 1-second bars", "\(s.days) of \(s.ofDays)")
                 if s.days > 0 {
-                    row("Stops settled on seconds", "\(s.exitsSettled)")
+                    row("Stops settled on seconds", "\(s.exitsSettled) of \(s.stopsTotal.map(String.init) ?? "—")")
                     if s.stopNotYetHeld > 0 { row("Touches before the broker held the stop", "\(s.stopNotYetHeld)") }
                     if s.minutesOn1mRule > 0 { row("Minutes on the 1-minute rule (seconds incomplete)", "\(s.minutesOn1mRule)") }
                 }

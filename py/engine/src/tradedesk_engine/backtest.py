@@ -283,8 +283,13 @@ class Backtest:
             t = int(sb.t[k])
             sec = t - m * 60
             o, hk, lk = float(sb.o[k]), float(sb.h[k]), float(sb.l[k])
+            bid, ask = float(sb.bid[k]), float(sb.ask[k])
             if waiting:                                       # an SL-limit order sitting at the broker
                 if (short and o <= lim) or (not short and o >= lim):
+                    if short and ask == ask and ask > 0:
+                        return "stop_loss", sec, min(lim, max(o, ask))
+                    if not short and bid == bid and bid > 0:
+                        return "stop_loss", sec, max(lim, min(o, bid))
                     return "stop_loss", sec, o
                 if (short and lk <= lim) or (not short and hk >= lim):
                     return "stop_loss", sec, lim
@@ -293,7 +298,6 @@ class Backtest:
             if lvl is None or not ((short and hk >= lvl) or (not short and lk <= lvl)):
                 continue
             px = o if ((short and o >= lvl) or (not short and o <= lvl)) else lvl
-            bid, ask = float(sb.bid[k]), float(sb.ask[k])
             if short and ask == ask and ask > 0:
                 px = max(px, ask)                             # buying back: no better than the offer
             elif not short and bid == bid and bid > 0:

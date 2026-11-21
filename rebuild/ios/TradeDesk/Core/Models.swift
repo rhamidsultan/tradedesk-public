@@ -340,6 +340,7 @@ struct RunAudit: Codable, Equatable {
     let exitsAtOldPrice: Int?
     struct Seconds: Codable, Equatable {
         let days: Int; let ofDays: Int; let exitsSettled: Int; let stopNotYetHeld: Int; let minutesOn1mRule: Int
+        let stopsTotal: Int?
     }
     let seconds: Seconds?            // premium stops settled on 1-second bars (runs from before: absent)
     let exitModel: String?

@@ -77,6 +77,7 @@ def run_one(ctx: AppContext, run_id: int) -> str:
             "trades": _trades(res),
             "audit": _audit(strat, res, days, start, end),
         }
+        result_path(ctx, run_id).write_bytes(gzip.compress(json.dumps(out, default=str).encode()))   # first, then the check
         if ctx.settings.backtest_seconds:
             try:
                 check = seconds_check(store, strat, days)
@@ -235,6 +236,7 @@ def _audit(strat, res, days, start, end) -> dict:
         "exit_model": "premium stops on 1-second bars where stored" if d.get("days_with_seconds") else "1-minute bars",
         "seconds": {"days": d.get("days_with_seconds", 0), "of_days": len(days),
                     "exits_settled": d.get("sec_exits", 0), "stop_not_yet_held": d.get("sec_stop_not_yet_held", 0),
+                    "stops_total": d.get("exits_by_reason", {}).get("stop_loss", 0),
                     "minutes_on_1m_rule": d.get("sec_fallback_minutes", 0)},
         "engine_version": ENGINE_VERSION,
         "spec_hash": hashlib.sha256(json.dumps(strat.model_dump(mode="json"), sort_keys=True).encode()).hexdigest()[:12],
@@ -276,8 +278,9 @@ def _run_sweep(ctx: AppContext, run_id: int, spec: dict, start, end, params: dic
         store = Store(ctx.settings.store_root, memory_limit=f"{ctx.settings.backtest_duckdb_mb}MB", threads=1)
         grid = params["grid"]
         split = _date.fromisoformat(params["split"])
-        res = sw.run_sweep(spec, grid, start, split, end, store, folds=int(params.get("folds") or 0), progress=progress,
-                           seconds=ctx.settings.backtest_seconds)
+        # sweeps stay on the 1-minute rule: 1-second bars exist only for recent days, which would give the
+        # out-of-sample period and the last folds a cheaper stop model than in-sample (audit 21 Nov 2026)
+        res = sw.run_sweep(spec, grid, start, split, end, store, folds=int(params.get("folds") or 0), progress=progress)
         ok = [r for r in res["rows"] if "error" not in r["in_sample"]]
         # plateau: a setting whose neighbours lose is fragile, however good it looks alone
         for r in ok:
