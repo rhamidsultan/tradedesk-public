@@ -53,7 +53,7 @@ def run_one(ctx: AppContext, run_id: int) -> str:
     try:
         strat = Strategy.model_validate(spec)
         store = Store(ctx.settings.store_root, memory_limit=f"{ctx.settings.backtest_duckdb_mb}MB", threads=1)
-        feed = StoreFeed(store, strat.instrument.underlying)
+        feed = StoreFeed(store, strat.instrument.underlying, seconds=ctx.settings.backtest_seconds)
         days = feed.dates(start, end)
         total = max(1, len(days))
         seen = {"n": 0}
@@ -77,6 +77,10 @@ def run_one(ctx: AppContext, run_id: int) -> str:
             "trades": _trades(res),
             "audit": _audit(strat, res, days, start, end),
         }
+        if ctx.settings.backtest_seconds:
+            check = seconds_check(store, strat, days)
+            if check:
+                out["seconds_check"] = check
         result_path(ctx, run_id).write_bytes(gzip.compress(json.dumps(out, default=str).encode()))
         with ctx.sessions() as db:
             r = db.get(BacktestRun, run_id)
@@ -98,6 +102,63 @@ def run_one(ctx: AppContext, run_id: int) -> str:
 
 class _Cancelled(Exception):
     pass
+
+
+def second_days(store, underlying: str) -> list[date]:
+    out = []
+    for p in (store.root / "bars_1s" / "opt" / underlying).glob("date=*"):
+        try:
+            if any(p.glob("*.parquet")):
+                out.append(date.fromisoformat(p.name[5:]))
+        except ValueError:
+            continue
+    return sorted(out)
+
+
+def seconds_check(store, strat, days: list[date]) -> dict | None:
+    """The C check: the days that have 1-second bars, run on the 1-minute rule and on 1-second exits, both from
+    flat on the first such day, day by day: net P&L and each exit (reason, time, price) side by side."""
+    from tradedesk_engine import Backtest
+    from tradedesk_engine.data import StoreFeed
+    have = set(second_days(store, strat.instrument.underlying))
+    sec_days = [d for d in days if d in have]
+    if not sec_days:
+        return None
+    a, b = sec_days[0], days[-1]
+    m1 = Backtest(strat, StoreFeed(store, strat.instrument.underlying)).run(a, b)
+    s1 = Backtest(strat, StoreFeed(store, strat.instrument.underlying, seconds=True)).run(a, b)
+    net1, net2 = dict(m1.daily), dict(s1.daily)
+
+    def exits(res, day):
+        by: dict[str, list] = {}
+        for f in res.fills:
+            if f.reason != "entry" and f.ts.startswith(day):
+                by.setdefault(f.symbol, []).append(f)
+        return by
+
+    rows = []
+    for d in sec_days:
+        k = str(d)
+        e1, e2 = exits(m1, k), exits(s1, k)
+        pairs = []
+        for sym in sorted(set(e1) | set(e2)):
+            x, y = e1.get(sym, []), e2.get(sym, [])
+            for i in range(max(len(x), len(y))):
+                f, g = (x[i] if i < len(x) else None), (y[i] if i < len(y) else None)
+                same = f and g and (f.reason, f.ts, f.price) == (g.reason, g.ts, g.price)
+                if not same:
+                    pairs.append({"symbol": sym,
+                                  "minute": {"reason": f.reason, "ts": f.ts, "price": f.price} if f else None,
+                                  "second": {"reason": g.reason, "ts": g.ts, "price": g.price} if g else None})
+        n1, n2 = round(net1.get(k, 0.0), 2), round(net2.get(k, 0.0), 2)
+        rows.append({"date": k, "net_1m": n1, "net_1s": n2, "diff": round(n2 - n1, 2),
+                     "stops_1m": sum(1 for v in e1.values() for f in v if f.reason == "stop_loss"),
+                     "stops_1s": sum(1 for v in e2.values() for f in v if f.reason == "stop_loss"),
+                     "changed_exits": pairs})
+    t1, t2 = round(sum(r["net_1m"] for r in rows), 2), round(sum(r["net_1s"] for r in rows), 2)
+    return {"from": str(a), "days": len(rows), "net_1m": t1, "net_1s": t2, "diff": round(t2 - t1, 2),
+            "days_different": sum(1 for r in rows if r["diff"] or r["changed_exits"]), "rows": rows,
+            "note": "Both runs start with no positions on the first day that has 1-second bars."}
 
 
 HEADLINE = ("net_pnl", "gross_pnl", "charges", "charges_pct_of_gross", "trades", "win_rate_pct", "max_drawdown",
@@ -158,6 +219,9 @@ def _audit(strat, res, days, start, end) -> dict:
         "lot_sizes_by_expiry": lots,
         "charges_rates": charge_rates,
         "skipped": {k: v for k, v in d.items() if k.startswith("entry_skipped") and v},
+        "seconds": {"days": d.get("days_with_seconds", 0), "of_days": len(days),
+                    "exits_settled": d.get("sec_exits", 0), "target_before_stop": d.get("sec_target_before_stop", 0),
+                    "minutes_on_1m_rule": d.get("sec_fallback_minutes", 0) + d.get("sec_no_touch", 0)},
         "engine_version": ENGINE_VERSION,
         "spec_hash": hashlib.sha256(json.dumps(strat.model_dump(mode="json"), sort_keys=True).encode()).hexdigest()[:12],
     }
@@ -251,7 +315,7 @@ def replay_day(ctx: AppContext, spec: dict, day) -> dict:
 
     strat = Strategy.model_validate(spec)
     store = Store(ctx.settings.store_root, memory_limit=ctx.settings.duckdb_memory)
-    feed = StoreFeed(store, strat.instrument.underlying)
+    feed = StoreFeed(store, strat.instrument.underlying, seconds=ctx.settings.backtest_seconds)
     if not feed.dates(day, day):
         raise FileNotFoundError(day)
     bt = Backtest(strat, feed)

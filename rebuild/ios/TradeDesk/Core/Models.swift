@@ -338,6 +338,10 @@ struct RunAudit: Codable, Equatable {
     let chargesRates: [String: [String: Double]]
     let skipped: [String: Int]
     let exitsAtOldPrice: Int?
+    struct Seconds: Codable, Equatable {
+        let days: Int; let ofDays: Int; let exitsSettled: Int; let targetBeforeStop: Int; let minutesOn1mRule: Int
+    }
+    let seconds: Seconds?            // stops and targets settled on 1-second bars (runs from before: absent)
     let engineVersion: String
     let specHash: String
 }
@@ -346,12 +350,14 @@ struct BacktestDetail: Decodable {
     let run: BacktestRunItem
     let metrics: Metrics?
     let audit: RunAudit?
-    private enum K: String, CodingKey { case metrics, audit }
+    let secondsCheck: JSONValue?     // the days with 1-second bars, run both ways
+    private enum K: String, CodingKey { case metrics, audit, secondsCheck }
     init(from decoder: Decoder) throws {
         run = try BacktestRunItem(from: decoder)
         let c = try decoder.container(keyedBy: K.self)
         metrics = try c.decodeIfPresent(Metrics.self, forKey: .metrics)
         audit = try c.decodeIfPresent(RunAudit.self, forKey: .audit)
+        secondsCheck = try c.decodeIfPresent(JSONValue.self, forKey: .secondsCheck)
     }
 }
 

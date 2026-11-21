@@ -78,6 +78,22 @@ def _mask_spikes(c: np.ndarray, ratio: float = 0.4) -> np.ndarray:
 
 
 @dataclass
+class Seconds:
+    """One option's 1-second bars for one day (only seconds that traded). `t` = seconds since 09:15:00."""
+    t: np.ndarray
+    o: np.ndarray
+    h: np.ndarray
+    l: np.ndarray
+    c: np.ndarray
+
+    def in_minute(self, m: int) -> range:
+        """Bar indexes inside minute m (09:15 + m), in time order."""
+        lo = int(np.searchsorted(self.t, m * 60, side="left"))
+        hi = int(np.searchsorted(self.t, (m + 1) * 60, side="left"))
+        return range(lo, hi)
+
+
+@dataclass
 class Contract:
     symbol: str
     expiry: date
@@ -98,15 +114,30 @@ class DayData:
             v.sort(key=lambda c: c.strike)
         self.expiries = sorted({c.expiry for c in options.values()})
         self.vix: Series | None = None
+        self.sec_loader = None              # symbol -> Seconds | None, when 1-second bars are stored for the day
+        self._sec: dict[str, Seconds | None] = {}
+
+    @property
+    def has_seconds(self) -> bool:
+        return self.sec_loader is not None
+
+    def seconds(self, symbol: str) -> Seconds | None:
+        """The option's 1-second bars, read the first time they are needed (only contracts held)."""
+        if self.sec_loader is None:
+            return None
+        if symbol not in self._sec:
+            self._sec[symbol] = self.sec_loader(symbol)
+        return self._sec[symbol]
 
 
 class StoreFeed:
     """Loads DayData from the store, one day at a time."""
 
-    def __init__(self, store: Store, underlying: str):
+    def __init__(self, store: Store, underlying: str, seconds: bool = False):
         self.store = store
         self.u = underlying
         self.con = store.connect()
+        self.seconds = seconds          # settle stops and targets on 1-second bars where they are stored
 
     def dates(self, start: date, end: date) -> list[date]:
         g = self.store.bars_glob("idx", self.u)
@@ -153,4 +184,20 @@ class StoreFeed:
             rows = self.con.execute(
                 f"SELECT ts, open, high, low, close, volume FROM read_parquet({[str(f) for f in vix_files]}) ORDER BY ts").fetchall()
             dd.vix = self._series(rows)
+        sec_files = list((self.store.root / "bars_1s" / "opt" / self.u / f"date={d}").glob("*.parquet")) \
+            if self.seconds else []
+        if sec_files:
+            files = [str(f) for f in sec_files]
+
+            def load_sec(symbol: str) -> Seconds | None:
+                rows = self.con.execute(
+                    f"SELECT ts, open, high, low, close FROM read_parquet({files}) WHERE symbol = ? ORDER BY ts",
+                    [symbol]).fetchall()
+                if not rows:
+                    return None
+                t0 = datetime.combine(d, T0)
+                t = np.array([int((r[0] - t0).total_seconds()) for r in rows], dtype=np.int32)
+                a = np.array([r[1:5] for r in rows], dtype=float)
+                return Seconds(t, a[:, 0], a[:, 1], a[:, 2], a[:, 3])
+            dd.sec_loader = load_sec
         return dd

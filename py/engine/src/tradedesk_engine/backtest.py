@@ -19,13 +19,19 @@ Honest fills (costs.fill_model = "honest", after Algo Lab PR #57):
   * decisions (re-entry gap, lot sizing from risk) use the last trade before the decision minute, never the fill.
   Unlike Algo Lab, orders do not wait 15 minutes for the next trade: a later fill would land after the
   strategy's entry and exit cut-offs and let decisions see prices from the future (audit 3 Nov 2026).
+1-second exits (feed seconds=True, where the recorder stored 1-second bars for the day):
+  * premium stops and targets (the orders the broker holds) are settled on the held option's 1-second bars inside
+    the minute: whichever level was touched first wins (the 1-minute rule assumes the stop), and the fill uses that
+    second's bar (gap at its open, else the level, stop_fill_frac of that second's range); fills carry the second;
+  * everything the app decides (entries, spot stops, position stops, trailing, time exits) stays on the minute,
+    as in paper and live; minutes without 1-second bars fall back to the 1-minute rule (counted).
 Charges: refs.yaml `charges_options`, by trade date. Lot size: refs.yaml by contract expiry.
 """
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field, asdict
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from tradedesk_marketcal import load_refs
 from tradedesk_spec import Strategy
@@ -167,7 +173,8 @@ class Backtest:
         p = price + adj if side == "BUY" else max(TICK, price - adj)
         return round(round(p / TICK) * TICK, 2)
 
-    def _fill(self, d: date, m: int, pos_or_c, side: str, qty: int, raw: float, reason: str, stale=False) -> Fill:
+    def _fill(self, d: date, m: int, pos_or_c, side: str, qty: int, raw: float, reason: str, stale=False,
+              sec: int | None = None) -> Fill:
         c = pos_or_c.c if isinstance(pos_or_c, Position) else pos_or_c
         try:                                              # D7: order larger than 10% of the last 5 minutes' volume
             lo = int(np.searchsorted(c.s.m, m - 5)); hi = int(np.searchsorted(c.s.m, m))
@@ -178,7 +185,8 @@ class Backtest:
             pass
         px = self._slip(raw, side)
         ch = self.cal.option_charges(d, side, px * qty)
-        f = Fill(ts_of(d, m).isoformat(sep=" "), c.symbol, side, qty, px, ch, reason, stale)
+        at = ts_of(d, m) if sec is None else ts_of(d, m) + timedelta(seconds=sec)
+        f = Fill(at.isoformat(sep=" "), c.symbol, side, qty, px, ch, reason, stale)
         self.fills.append(f)
         self.diag["fills"] += 1
         self.diag["stale_fills"] += int(stale)
@@ -244,6 +252,28 @@ class Backtest:
             self.diag["sl_unfilled"] = self.diag.get("sl_unfilled", 0) + 1
             return None
         return px
+
+    def _sec_exit(self, day: DayData, p: Position, m: int, short: bool):
+        """Settle this minute's stop / target on 1-second bars: ("stop_loss" | "target", second, raw price),
+        ("pending", second, None) for an unfilled SL-limit, or None to use the 1-minute rule."""
+        if p.sl_pending or not day.has_seconds:
+            return None
+        sb = day.seconds(p.c.symbol)
+        if sb is None:
+            return None
+        rng = sb.in_minute(m)
+        if not len(rng):
+            return None
+        for k in rng:
+            o, h, l, c = float(sb.o[k]), float(sb.h[k]), float(sb.l[k]), float(sb.c[k])
+            sec = int(sb.t[k]) - m * 60
+            if p.sl is not None and ((short and h >= p.sl) or (not short and l <= p.sl)):
+                px = self._stop_fill(p, o, h, l, c, short)
+                return ("pending", sec, None) if px is None else ("stop_loss", sec, px)
+            if p.tgt is not None and ((short and l <= p.tgt) or (not short and h >= p.tgt)):
+                gap = (short and o <= p.tgt) or (not short and o >= p.tgt)
+                return "target", sec, (o if gap else p.tgt)
+        return "none", None, None          # the seconds show neither level touched in this minute
 
     def _trail(self, p: Position, h: float, l: float, short: bool, good: bool):
         """Move a premium stop behind the best price seen (after this bar's stop check: no same-bar look-ahead)."""
@@ -338,6 +368,8 @@ class Backtest:
             self.diag["days_no_spot"] += 1
             return
         self.signals.ctx.new_day(spot)
+        if day.has_seconds:
+            self.diag["days_with_seconds"] = self.diag.get("days_with_seconds", 0) + 1
         self._entry_charges_today = 0.0
         self.peak_margin_today = 0.0
         if getattr(self, "_spot_first", None) is None and len(spot.o):
@@ -358,7 +390,8 @@ class Backtest:
         last_spot = float(spot.c[0])
         pyctx = None
 
-        def close_pos(p: Position, m: int, raw: float, reason: str, stale=False, qty: int | None = None):
+        def close_pos(p: Position, m: int, raw: float, reason: str, stale=False, qty: int | None = None,
+                      sec: int | None = None):
             """Close a position (or `qty` of it: partial closes keep the rest open)."""
             nonlocal realised_today
             q = p.qty if qty is None else max(0, min(int(qty), p.qty))
@@ -367,7 +400,7 @@ class Backtest:
             side = "SELL" if p.side == "BUY" else "BUY"
             if side == "BUY":
                 raw = max(raw, self._intrinsic(p.c, spot, m))
-            f = self._fill(d, m, p, side, q, raw, reason, stale)
+            f = self._fill(d, m, p, side, q, raw, reason, stale, sec=sec)
             f.trade_id = p.trade_id
             sign = 1 if p.side == "BUY" else -1
             base = p.mark_base if p.mark_base else p.entry_price
@@ -441,6 +474,33 @@ class Backtest:
                     o, h, l, c = (float(x) for x in (p.c.s.o[i], p.c.s.h[i], p.c.s.l[i], p.c.s.c[i]))
                     p.last = c
                     short = p.side == "SELL"
+                    touched = (p.sl is not None and ((short and h >= p.sl) or (not short and l <= p.sl))) or \
+                              (p.tgt is not None and ((short and l <= p.tgt) or (not short and h >= p.tgt)))
+                    if touched and not p.sl_pending and day.has_seconds:
+                        sx = self._sec_exit(day, p, m, short)
+                        if sx is None:
+                            self.diag["sec_fallback_minutes"] = self.diag.get("sec_fallback_minutes", 0) + 1
+                        else:
+                            why, sec, px = sx
+                            both = p.sl is not None and p.tgt is not None and \
+                                ((short and h >= p.sl and l <= p.tgt) or (not short and l <= p.sl and h >= p.tgt))
+                            if both:
+                                self.diag["sec_both_levels_in_minute"] = self.diag.get("sec_both_levels_in_minute", 0) + 1
+                            if why == "pending":
+                                p.sl_pending = 1
+                                self.diag["sl_unfilled"] = self.diag.get("sl_unfilled", 0) + 1
+                                continue
+                            if why == "none":     # the minute bar's extreme is not in the seconds: trust the minute
+                                self.diag["sec_no_touch"] = self.diag.get("sec_no_touch", 0) + 1
+                            else:
+                                self.diag["sec_exits"] = self.diag.get("sec_exits", 0) + 1
+                                if why == "target" and both:
+                                    self.diag["sec_target_before_stop"] = self.diag.get("sec_target_before_stop", 0) + 1
+                                close_pos(p, m, px, why, sec=sec)
+                                if why == "stop_loss":
+                                    sl_hits_today += 1
+                                    self.stopped_out[p.c.symbol] = (px, p.side)
+                                continue
                     if p.sl is not None and (p.sl_pending or (short and h >= p.sl) or (not short and l <= p.sl)):
                         px = self._stop_fill(p, o, h, l, c, short)
                         if px is None:
