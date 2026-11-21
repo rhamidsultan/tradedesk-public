@@ -24,6 +24,8 @@ final class AppModel {
     var openAlerts: [AlertItem] = []
     var indexes: IndexStrip?
     var latestRuns: [BacktestRunItem] = []
+    /// This login's own order for arrangeable lists (templates, home_cards, indexes, paper_sessions), from the server.
+    var lists: [String: [String]] = [:]
     var lastError: String?
     var lastRefresh: Date?
     /// True when the last attempt to reach the server failed: screens grey out and show the data's age.
@@ -181,6 +183,25 @@ final class AppModel {
 
     // MARK: data
 
+    /// `items` in this login's saved order for `list`. Items not in it yet keep their own order, before the
+    /// arranged ones when `newFirst` (a new session on top), else after them (a new template at the end).
+    func arranged<T>(_ items: [T], _ list: String, newFirst: Bool = false, id: (T) -> String) -> [T] {
+        guard let order = lists[list], !order.isEmpty else { return items }
+        let rank = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+        let known = items.filter { rank[id($0)] != nil }.sorted { rank[id($0)]! < rank[id($1)]! }
+        let fresh = items.filter { rank[id($0)] == nil }
+        return newFirst ? fresh + known : known + fresh
+    }
+
+    /// Save this login's order for a list (kept on the server, so it follows the login to other devices).
+    func saveList(_ list: String, _ ids: [String]) async {
+        lists[list] = ids
+        struct B: Encodable { let ids: [String] }
+        struct R: Decodable { let ids: [String] }
+        do { let _: R = try await api.put("/v1/me/lists/\(list)", B(ids: ids)) }
+        catch { lastError = "Order not saved: \(error.localizedDescription)" }
+    }
+
     func refresh() async throws {
         do {
             status = try await api.get("/v1/status")
@@ -191,6 +212,7 @@ final class AppModel {
                 forcedHideAmounts = me["hide_amounts"]?.bool == true
                 if forcedHideAmounts { UserDefaults.standard.set(true, forKey: "hideAmounts") }
             }
+            if let l: [String: [String]] = try? await api.get("/v1/me/lists") { lists = l }
             if can("market_data") {
                 indexes = try? await api.get("/v1/market/indexes")
             } else {

@@ -7,6 +7,7 @@ struct TradeView: View {
     @State private var overview: JSONValue?
     @State private var sessions: [JSONValue] = []
     @State private var error: String?
+    @State private var sessionsEdit: EditMode = .inactive
     @State private var loaded = false
     @State private var showStart = false
     @State private var path = NavigationPath()
@@ -24,7 +25,8 @@ struct TradeView: View {
                 }
                 if let note { Section { Label(note, systemImage: "info.circle").font(.footnote) } }
                 if let o = overview { overviewSection(o) }
-                let active = sessions.filter { $0["status"]?.string != "stopped" }
+                let active = model.arranged(sessions.filter { $0["status"]?.string != "stopped" }, "paper_sessions",
+                                            newFirst: true) { String(Int($0["id"]?.number ?? 0)) }
                 let ended = sessions.filter { $0["status"]?.string == "stopped" }
                 Section {
                     if loaded && active.isEmpty {
@@ -38,10 +40,26 @@ struct TradeView: View {
                         }
                         .buttonStyle(.borderedProminent).tint(Color.tdPaper)
                     }
-                    ForEach(Array(active.enumerated()), id: \.offset) { _, s in
+                    ForEach(active, id: \.self) { s in
                         NavigationLink(value: Int(s["id"]?.number ?? 0)) { SessionRow(s: s) }
                     }
-                } header: { Text("Paper sessions") }
+                    .onMove { from, to in
+                        var ids = active.map { String(Int($0["id"]?.number ?? 0)) }
+                        ids.move(fromOffsets: from, toOffset: to)
+                        Task { await model.saveList("paper_sessions", ids) }
+                    }
+                } header: {
+                    HStack {
+                        Text("Paper sessions")
+                        Spacer()
+                        if active.count > 1 {
+                            Button(sessionsEdit.isEditing ? "Done" : "Reorder") {
+                                withAnimation { sessionsEdit = sessionsEdit.isEditing ? .inactive : .active }
+                            }
+                            .font(.subheadline).textCase(nil)
+                        }
+                    }
+                }
                 Section("Market tools") {
                     NavigationLink { OptionChainToolView() } label: { Label("Option chain", systemImage: "tablecells") }
                     NavigationLink { AnalyserView() } label: { Label("Analyser", systemImage: "chart.xyaxis.line") }
@@ -59,6 +77,7 @@ struct TradeView: View {
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
+            .environment(\.editMode, $sessionsEdit)
             .navigationTitle("Trade")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

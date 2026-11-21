@@ -36,7 +36,7 @@ struct StrategiesView: View {
                 }
                 Section {
                     if mine.isEmpty && loaded {
-                        Text("None yet. Customise a template below or start blank.").foregroundStyle(.secondary)
+                        Text("None yet. Open Templates to customise one, or + › Start blank.").foregroundStyle(.secondary)
                     }
                     ForEach(mine, id: \.self) { d in
                         Button { path.append(StrategyRoute.strategy(Int(d["id"]?.number ?? 0))) } label: {
@@ -71,37 +71,17 @@ struct StrategiesView: View {
                         Text("Tap Reorder and drag ≡ to arrange, or swipe right on one to move it to the top.")
                     }
                 }
-                let groups = Dictionary(grouping: gallery) { $0["category"]?.string ?? "Other" }
-                ForEach(groups.keys.sorted(), id: \.self) { cat in
-                    Section(cat) {
-                        ForEach(Array((groups[cat] ?? []).enumerated()), id: \.offset) { _, g in
-                            let t = templates.first { $0.id == g["id"]?.string }
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(g["name"]?.string ?? "").font(.headline)
-                                HStack(spacing: 6) {
-                                    ForEach((g["chips"]?.array ?? []).compactMap(\.string), id: \.self) { c in
-                                        Text(c).font(.caption2.weight(.semibold)).padding(.horizontal, 7).padding(.vertical, 3)
-                                            .background(.quaternary, in: .capsule)
-                                    }
-                                }
-                                if let t { Text("\(t.underlying) · stop \(stopText(t)) · max loss a day \(Fmt.rupees(t.maxLossPerDay))").font(.caption).foregroundStyle(.secondary) }
-                                HStack {
-                                    Button("Customise") { Task { await customise(g["id"]?.string) } }.buttonStyle(.glass)
-                                    if let t { Button("Backtest") { path.append(StrategyRoute.template(t)) }.buttonStyle(.glass) }
-                                    if let t {
-                                        Menu {
-                                            Button("Find best settings", systemImage: "slider.horizontal.below.square.and.square.filled") { path.append(StrategyRoute.sweep(t.id)) }
-                                            Button("Replay a day", systemImage: "play.circle") { path.append(StrategyRoute.replay(t.id)) }
-                                        } label: { Image(systemName: "ellipsis.circle") }
-                                        .accessibilityLabel("More for \(t.name)")
-                                    }
-                                }
-                                .font(.subheadline)
+                Section {
+                    NavigationLink(value: StrategyRoute.templates) {
+                        Label {
+                            HStack {
+                                Text("Templates")
+                                Spacer()
+                                if !gallery.isEmpty { Text("\(gallery.count)").foregroundStyle(.secondary).monospacedDigit() }
                             }
-                            .padding(.vertical, 2)
-                        }
+                        } icon: { Image(systemName: "square.grid.2x2") }
                     }
-                }
+                } footer: { Text("Ready-made strategies to backtest as they are, or customise into one of yours.") }
             }
             .environment(\.editMode, $editMode)
             .navigationTitle("Strategies")
@@ -127,6 +107,9 @@ struct StrategiesView: View {
                 case .sweep(let template): SweepFormView(template: template, specFromRun: nil)
                 case .replay(let template): ReplayView(template: template)
                 case .backtests(let sid, let name): BacktestsView(strategyID: sid, strategyName: name)
+                case .templates:
+                    TemplatesView(templates: templates, gallery: gallery, open: { path.append($0) },
+                                  customise: { await customise($0) })
                 }
             }
             .navigationDestination(for: BacktestRunItem.self) { r in
@@ -139,12 +122,6 @@ struct StrategiesView: View {
             .onAppear { startPolling() }
             .onDisappear { poll?.cancel() }
         }
-    }
-
-    private func stopText(_ t: StrategyTemplate) -> String {
-        guard let s = t.stopLoss, let v = s.value else { return "set" }
-        switch s.type { case "multiple": return "\(v.formatted())× premium"; case "pct": return "\(v.formatted())%"
-        default: return "\(v.formatted()) \(s.type ?? "")" }
     }
 
     private func startPolling() {
@@ -171,7 +148,7 @@ struct StrategiesView: View {
     }
 
     /// Customise a template (or start blank) into the builder; the draft is kept on the server.
-    private func customise(_ template: String?) async {
+    func customise(_ template: String?) async {
         struct B: Encodable { let template: String?; let blank: Bool }
         do {
             let d = try await model.api.raw("POST", "/v1/strategies", body: B(template: template, blank: template == nil))
@@ -208,6 +185,7 @@ enum StrategyRoute: Hashable {
     case sweep(String)
     case replay(String)
     case backtests(Int?, String?)        // the results page, for one strategy or all
+    case templates
 }
 
 struct MyStrategyRow: View {

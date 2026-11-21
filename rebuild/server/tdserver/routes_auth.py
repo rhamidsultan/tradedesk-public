@@ -14,7 +14,7 @@ from . import devicekeys
 from .context import AppContext
 from .crypto import hash_token, random_token
 from .deps import Principal, audit, client_ip, current, get_ctx, get_db, owner, rate_limit
-from .models import AuthSession, Challenge, Device, Invite, User
+from .models import AuthSession, Challenge, Device, Invite, User, UserList
 
 router = APIRouter(prefix="/v1")
 
@@ -165,6 +165,41 @@ def me(p: Principal = Depends(current)):
     return {"id": p.user.id, "name": p.user.name, "role": p.user.role,
             "access": access_of(p.user), "hide_amounts": hides(p.user),
             "device": {"id": p.device.id, "name": p.device.name} if p.device else None}
+
+
+# lists a login may arrange on the phone; their own preference, so not gated by area access
+LISTS = {"templates", "home_cards", "indexes", "paper_sessions"}
+
+
+@router.get("/me/lists")
+def my_lists(p: Principal = Depends(current), db: Session = Depends(get_db)):
+    """The orders this login saved: {list name: [item ids, top first]}."""
+    return {r.name: r.ids for r in db.scalars(select(UserList).where(UserList.user_id == p.user.id))}
+
+
+class ListIn(BaseModel):
+    ids: list[str] = Field(..., max_length=200)
+
+    @field_validator("ids")
+    @classmethod
+    def _short(cls, v: list[str]) -> list[str]:
+        if any(len(x) > 64 for x in v):
+            raise ValueError("an id is too long")
+        return list(dict.fromkeys(v))
+
+
+@router.put("/me/lists/{name}")
+def save_list(name: str, body: ListIn, p: Principal = Depends(current), ctx: AppContext = Depends(get_ctx),
+              db: Session = Depends(get_db)):
+    if name not in LISTS:
+        raise HTTPException(404, "Unknown list.")
+    row = db.get(UserList, (p.user.id, name))
+    if row is None:
+        db.add(UserList(user_id=p.user.id, name=name, ids=body.ids, updated_at=ctx.clock.now()))
+    else:
+        row.ids, row.updated_at = body.ids, ctx.clock.now()
+    db.flush()
+    return {"name": name, "ids": body.ids}
 
 
 def _device_out(d: Device, this_id: int | None, now: datetime) -> dict:

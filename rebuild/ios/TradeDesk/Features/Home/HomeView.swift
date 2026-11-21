@@ -6,6 +6,7 @@ struct HomeView: View {
     @State private var drafts: [JSONValue] = []
     @State private var paper: JSONValue?
     @State private var paperError = false
+    @State private var arranging: ArrangeWhat?
 
     var body: some View {
         @Bindable var model = model
@@ -14,15 +15,10 @@ struct HomeView: View {
                 GlassEffectContainer(spacing: 16) {
                     VStack(spacing: 16) {
                         if let c = model.status?.alerts.critical { criticalBanner(c) }   // always first
-                        if model.can("market_data") { IndexStripView() }
-                        if model.can("portfolio") { NetWorthCard() }
                         if let exp = model.installExpiry, exp.timeIntervalSinceNow < 2 * 86_400 { installCard(exp) }
-                        marketCard
-                        if model.can("paper", "use") || model.can("live", "use") { kiteCard }
-                        alertsCard
-                        if !drafts.isEmpty && model.can("research") { draftsCard }
-                        if !model.latestRuns.isEmpty && model.can("backtests") { resultsCard }
-                        if model.can("paper") { tradingCard }
+                        ForEach(model.arranged(HomeCard.allCases, "home_cards") { $0.rawValue }) { card in
+                            homeCard(card)                     // in the order this login arranged (Arrange Home)
+                        }
                         if let e = model.lastError {
                             Label(e, systemImage: "wifi.exclamationmark").font(.footnote).foregroundStyle(Color.tdWarn)
                         }
@@ -45,11 +41,32 @@ struct HomeView: View {
             }
             .navigationTitle(greeting)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        Button("Arrange Home", systemImage: "rectangle.3.group") { arranging = .cards }
+                        if model.can("market_data") {
+                            Button("Arrange index tiles", systemImage: "square.grid.3x1.below.line.grid.1x2") { arranging = .indexes }
+                        }
+                    } label: { Image(systemName: "arrow.up.arrow.down") }
+                    .accessibilityLabel("Arrange Home")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(value: Route.alerts) {
                         Image(systemName: (model.status?.alerts.open ?? 0) > 0 ? "bell.badge" : "bell")
                     }
                     .accessibilityLabel("Alerts")
+                }
+            }
+            .sheet(item: $arranging) { what in
+                switch what {
+                case .cards:
+                    ArrangeSheet(title: "Arrange Home", list: "home_cards",
+                                 items: model.arranged(HomeCard.allCases, "home_cards") { $0.rawValue }.map { ArrangeItem(id: $0.rawValue, label: $0.label) },
+                                 footer: "Alerts that need you now and the reinstall reminder always stay at the top. Cards you have no access to stay hidden.")
+                case .indexes:
+                    let tiles = model.arranged(model.indexes?.indexes ?? [], "indexes") { $0.underlying }
+                    ArrangeSheet(title: "Index tiles", list: "indexes",
+                                 items: tiles.map { ArrangeItem(id: $0.underlying, label: $0.underlying == "INDIAVIX" ? "India VIX" : $0.underlying) })
                 }
             }
             .navigationDestination(for: Route.self) { route in
@@ -62,6 +79,19 @@ struct HomeView: View {
                 default: EmptyView()
                 }
             }
+        }
+    }
+
+    @ViewBuilder private func homeCard(_ c: HomeCard) -> some View {
+        switch c {
+        case .indexes: if model.can("market_data") { IndexStripView() }
+        case .portfolio: if model.can("portfolio") { NetWorthCard() }
+        case .market: marketCard
+        case .kite: if model.can("paper", "use") || model.can("live", "use") { kiteCard }
+        case .alerts: alertsCard
+        case .drafts: if !drafts.isEmpty && model.can("research") { draftsCard }
+        case .results: if !model.latestRuns.isEmpty && model.can("backtests") { resultsCard }
+        case .trading: if model.can("paper") { tradingCard }
         }
     }
 
@@ -224,3 +254,23 @@ struct HomeView: View {
         }
     }
 }
+
+/// The cards Home can show, in their default order (each login can arrange them).
+enum HomeCard: String, CaseIterable, Identifiable {
+    case indexes, portfolio, market, kite, alerts, drafts, results, trading
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .indexes: "Index tiles"
+        case .portfolio: "Net worth"
+        case .market: "Market"
+        case .kite: "Zerodha login"
+        case .alerts: "Alerts"
+        case .drafts: "Drafts"
+        case .results: "Latest backtests"
+        case .trading: "Trading (paper and live)"
+        }
+    }
+}
+
+enum ArrangeWhat: String, Identifiable { case cards, indexes; var id: String { rawValue } }

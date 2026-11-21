@@ -10,7 +10,7 @@ struct IndexStripView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 GlassEffectContainer(spacing: 10) {
                     HStack(spacing: 10) {
-                        ForEach(s.indexes) { q in tile(q) }
+                        ForEach(model.arranged(s.indexes, "indexes") { $0.underlying }) { q in tile(q) }
                     }
                     .padding(.horizontal, 2)
                 }
