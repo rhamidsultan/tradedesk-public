@@ -37,7 +37,7 @@ struct DataDayView: View {
                         if let t = b.date { LineMark(x: .value("Time", t), y: .value("Close", b.c)) }
                     }
                     .chartYScale(domain: .automatic(includesZero: false))
-                    .chartXAxis { AxisMarks(values: .stride(by: .hour)) { _ in AxisGridLine(); AxisValueLabel(format: .dateTime.hour()) } }
+                    .istTimeAxis()
                     .environment(\.timeZone, Fmt.ist)
                     .frame(height: 200)
                     .accessibilityLabel("Index from \(bars.first.map { String(format: "%.0f", $0.c) } ?? "") to \(bars.last.map { String(format: "%.0f", $0.c) } ?? "")")
