@@ -454,14 +454,17 @@ struct CycleRow: View {
     }
 }
 
-/// Replay a booked day minute by minute: where the session stood at any minute.
+/// Replay a booked day minute by minute: where the session stood at any minute, with the index and the
+/// session's P&L (closed + open, after charges) drawn on one chart up to that minute.
 struct ScrubSection: View {
     @Environment(AppModel.self) private var model
+    @AppStorage("hideAmounts") private var hide = false
     let sessionID: Int
     let days: [String]
     @State private var day: String?
     @State private var minute = 0.0
     @State private var st: JSONValue?
+    @State private var curve: JSONValue?        // the whole day's index and P&L, fetched once per day
     @State private var error: String?
     @State private var task: Task<Void, Never>?
 
@@ -473,6 +476,7 @@ struct ScrubSection: View {
                 Picker("Day", selection: $day) {
                     ForEach(days.reversed(), id: \.self) { Text(Fmt.marketDay($0)).tag(String?.some($0)) }
                 }
+                if let curve { chart(curve) }
                 VStack(alignment: .leading) {
                     Text("At \(clock(Int(minute)))").font(.headline).monospacedDigit()
                     Slider(value: $minute, in: 0...374, step: 1) { Text("Minute") }
@@ -480,7 +484,7 @@ struct ScrubSection: View {
                 }
                 if let error { Text(error).font(.caption).foregroundStyle(Color.tdWarn) }
                 if let st {
-                    PnlLine(label: "Day P&L at \(st["as_of"]?.string ?? clock(Int(minute)))", value: st["day_pnl"]?.number ?? 0)
+                    PnlLine(label: "P&L at \(st["as_of"]?.string ?? clock(Int(minute))) (incl. open legs, after charges)", value: st["day_pnl"]?.number ?? 0)
                     ForEach(Array((st["positions"]?.array ?? []).enumerated()), id: \.offset) { _, p in LegRow(p: p) }
                     if (st["positions"]?.array ?? []).isEmpty { Text("No open legs at this minute.").foregroundStyle(.secondary) }
                     ForEach(Array((st["fills_today"]?.array ?? []).reversed().prefix(10).enumerated()), id: \.offset) { _, f in FillRow(f: f) }
@@ -488,24 +492,76 @@ struct ScrubSection: View {
             }
         } header: { Text("Replay a day") }
         .onAppear { if day == nil { day = days.last } }
-        .onChange(of: day) { fetch() }
+        .onChange(of: day) { curve = nil; fetch(withCurve: true) }
         .onChange(of: minute) { fetch() }
     }
+
+    @ViewBuilder private func chart(_ c: JSONValue) -> some View {
+        let m = Int(minute)
+        let idx = (c["index"]?.array ?? []).filter { Int($0["m"]?.number ?? 0) <= m }
+        let pnlAll = c["pnl"]?.array ?? []
+        let pnl = pnlAll.filter { Int($0["m"]?.number ?? 0) <= m }
+        let sc = ReplayScale(index: (c["index"]?.array ?? []).compactMap { $0["c"]?.number },
+                             pnl: pnlAll.compactMap { $0["pnl"]?.number })
+        VStack(alignment: .leading, spacing: 4) {
+            Chart {
+                ForEach(Array(idx.enumerated()), id: \.offset) { _, b in
+                    if let t = Fmt.parseIST(b["ts"]?.string ?? ""), let v = b["c"]?.number {
+                        LineMark(x: .value("Time", t), y: .value("Index", v), series: .value("Line", "Index"))
+                            .foregroundStyle(Color.secondary)
+                    }
+                }
+                if sc.hasPnl {
+                    RuleMark(y: .value("P&L zero", sc.y(0)))
+                        .foregroundStyle(Color.accentColor.opacity(0.35)).lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    ForEach(Array(pnl.enumerated()), id: \.offset) { _, x in
+                        if let t = Fmt.parseIST(x["ts"]?.string ?? ""), let v = x["pnl"]?.number {
+                            LineMark(x: .value("Time", t), y: .value("Index", sc.y(v)), series: .value("Line", "P&L"))
+                                .foregroundStyle(Color.accentColor).lineStyle(StrokeStyle(lineWidth: 2))
+                        }
+                    }
+                }
+            }
+            .chartXScale(domain: dayStart...dayStart.addingTimeInterval(374 * 60))
+            .chartYScale(domain: sc.lo...sc.hi)
+            .chartYAxis {
+                AxisMarks(position: .leading)
+                if sc.hasPnl {
+                    AxisMarks(position: .trailing, values: sc.pnlTicks.map { sc.y($0) }) { v in
+                        AxisValueLabel {
+                            if !hide, let y = v.as(Double.self) { Text(Fmt.rupeesShort(sc.pnl(at: y))).foregroundStyle(Color.accentColor) }
+                        }
+                    }
+                }
+            }
+            .environment(\.timeZone, Fmt.ist)
+            .frame(height: 220)
+            .accessibilityLabel("Index and the session's P&L up to \(clock(m))")
+            Text("Grey: index (left axis) · Blue: P&L incl. open legs, after charges (right axis)")
+                .font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+
+    private var dayStart: Date { Fmt.parseIST("\(day ?? "") 09:15:00") ?? .now }
 
     private func clock(_ m: Int) -> String {
         let t = 9 * 60 + 15 + m
         return String(format: "%02d:%02d", t / 60, t % 60)
     }
 
-    private func fetch() {
+    private func fetch(withCurve: Bool = false) {
         task?.cancel()
         guard let day else { return }
         let m = Int(minute)
+        let wantCurve = withCurve || curve == nil
         task = Task {
             try? await Task.sleep(for: .milliseconds(300))          // wait for the slider to settle
             if Task.isCancelled { return }
             do {
-                st = try await model.api.raw("GET", "/v1/paper/sessions/\(sessionID)/scrub?day=\(day)&minute=\(m)")
+                let r = try await model.api.raw("GET", "/v1/paper/sessions/\(sessionID)/scrub?day=\(day)&minute=\(m)"
+                                                + (wantCurve ? "&curve=true" : ""))
+                st = r
+                if wantCurve, r["pnl"] != nil { curve = r }
                 error = nil
             } catch { self.error = error.localizedDescription }
         }

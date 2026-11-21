@@ -507,7 +507,8 @@ class Backtest:
                     if had_open:
                         self.diag["daily_loss_stops"] += 1
                     locked = True
-            if self.curve is not None:            # replay: the same figure the daily loss limit watches
+            # getattr: paper sessions keep engines pickled before this field existed
+            if getattr(self, "curve", None) is not None:   # replay: the same figure the daily loss limit watches
                 mtm_c = 0.0
                 for p in self.positions:
                     px, _ = self._price_now(p.c, m)

@@ -339,3 +339,16 @@ def test_minute_pnl_curve_matches_the_day_and_changes_nothing(tmp_path):
     assert len(bt.curve) == 375 and bt.curve[-1][2] == pytest.approx(res.daily[0][1], abs=0.05)
     before_stop = [v for _, m, v in bt.curve if 30 < m < 99]
     assert before_stop and any(v != before_stop[0] for v in before_stop)   # open P&L moves with the PE price
+
+
+def test_an_engine_saved_before_the_curve_field_still_runs(tmp_path):
+    """Paper sessions keep engines pickled before `curve` existed: running one must not fail."""
+    b = Builder(tmp_path / "s")
+    b.spot(D1, flat(25000))
+    b.opt(D1, EXP, 26000, "CE", lambda i: 40.0)
+    b.opt(D1, EXP, 26100, "CE", lambda i: 20.0)
+    b.opt(D1, EXP, 24000, "PE", lambda i: 40.0)
+    b.opt(D1, EXP, 23900, "PE", lambda i: 25.0)
+    bt = Backtest(strangle(), StoreFeed(b.build(), "NIFTY"))
+    del bt.curve
+    assert bt.run(D1, D1).daily

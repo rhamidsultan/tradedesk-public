@@ -377,9 +377,10 @@ def exclude(rid: int, tid: int, body: ExcludeIn, request: Request, p: Principal 
 
 
 @router.get("/sessions/{rid}/scrub")
-def scrub(rid: int, day: date, minute: int, p: Principal = Depends(current), ctx: AppContext = Depends(get_ctx),
-          db: Session = Depends(get_db)):
-    """The session as it stood at the end of a minute of a booked day (positions, P&L, fills so far)."""
+def scrub(rid: int, day: date, minute: int, curve: bool = False, p: Principal = Depends(current),
+          ctx: AppContext = Depends(get_ctx), db: Session = Depends(get_db)):
+    """The session as it stood at the end of a minute of a booked day (positions, P&L, fills so far).
+    curve=true adds the day's index and P&L each minute (for the chart; ask once per day)."""
     from .engine import PaperEngine
     from .runner import Days, day_actions
     r = _own(db, p, rid)
@@ -392,10 +393,10 @@ def scrub(rid: int, day: date, minute: int, p: Principal = Depends(current), ctx
     except FileNotFoundError:
         raise HTTPException(404, "No saved days for this session.") from None
     st = e.scrub(Days(ctx).load(r.underlying, day), minute, day_actions(r, day),
-                 r.start_minute if day == r.first_day else 0, r.rules)
+                 r.start_minute if day == r.first_day else 0, r.rules, curve=curve)
     if st is None:
         raise HTTPException(404, "That day is no longer kept (last 60 days only).")
-    return {k: st[k] for k in ("date", "as_of", "day_pnl", "positions", "fills_today")}
+    return {k: st[k] for k in ("date", "as_of", "day_pnl", "positions", "fills_today", "pnl", "index") if k in st}
 
 
 class AllIn(BaseModel):
