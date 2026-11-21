@@ -164,8 +164,9 @@ say "Your iPhone"
 if OUT=$(envrun create-owner-invite Hamid 2>&1); then
   echo "  $OUT"
   echo "  In the app: More › About › Forget this device and enrol again, then server https://$HOST and this code."
-else
-  echo "  An owner already exists: sign in with Face ID (server https://$HOST)."
+elif OUT=$(envrun create-device-invite 2>&1); then
+  echo "  Already set up: open the app and use Face ID (server https://$HOST)."
+  echo "  If the app asks for an invite code (new or reinstalled app): $OUT"
 fi
 echo
 echo "Done. td2 $VERSION at https://$HOST"

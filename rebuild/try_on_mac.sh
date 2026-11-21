@@ -41,7 +41,8 @@ export TD2_RESEARCH_IN_MARKET_HOURS=true          # on the Mac, backtests run at
 
 cd rebuild/server
 "$VENV/bin/alembic" upgrade head >/dev/null
-INVITE="$("$VENV/bin/python" -m tdserver.cli create-owner-invite Hamid 2>/dev/null || true)"
+INVITE="$("$VENV/bin/python" -m tdserver.cli create-owner-invite Hamid 2>/dev/null ||
+          "$VENV/bin/python" -m tdserver.cli create-device-invite 2>/dev/null || true)"
 
 # your old portfolio history, if you copied it here (see the steps): imported once, safe to repeat
 if [ -f "$TRIAL/portfolio.db" ]; then
