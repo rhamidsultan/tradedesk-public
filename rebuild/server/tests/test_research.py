@@ -192,6 +192,10 @@ def test_compare_and_replay(client, owner, research):
     assert rp["day"] == "2026-10-12" and len(rp["index"]) == 375
     assert [f["reason"] for f in rp["fills"]][:2] == ["entry", "entry"]
     assert rp["steps"][-1]["realised"] <= 0 or rp["steps"]
+    # the day's P&L each minute (closed + open, net of charges), on the index's clock, ending at the day's net
+    assert len(rp["pnl"]) == 375 and rp["pnl"][0]["ts"] == rp["index"][0]["ts"][:19]
+    assert rp["pnl"][-1]["pnl"] == pytest.approx(rp["net"], abs=1)
+    assert any(x["pnl"] != 0 for x in rp["pnl"])
     assert client.post("/v1/research/replay", json={"template": "strangle_nifty", "day": "2026-10-20"},
                        headers=h).status_code == 404
 

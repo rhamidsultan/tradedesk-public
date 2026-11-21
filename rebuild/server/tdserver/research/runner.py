@@ -254,7 +254,9 @@ def replay_day(ctx: AppContext, spec: dict, day) -> dict:
     feed = StoreFeed(store, strat.instrument.underlying)
     if not feed.dates(day, day):
         raise FileNotFoundError(day)
-    res = Backtest(strat, feed).run(day, day)
+    bt = Backtest(strat, feed)
+    bt.curve = []
+    res = bt.run(day, day)
     bars = ctx.data.index_bars(strat.instrument.underlying, day.isoformat()) if ctx.data else []
     fills = [{"ts": f.ts, "symbol": f.symbol, "side": f.side, "qty": f.qty, "price": f.price, "charges": f.charges,
               "reason": f.reason, "stale": f.stale, "trade": f.trade_id} for f in res.fills]
@@ -276,6 +278,8 @@ def replay_day(ctx: AppContext, spec: dict, day) -> dict:
         realised -= f.charges
         pos[f.symbol] = held
         steps.append({"ts": f.ts, "realised": round(realised, 2), "open": {k: v[0] for k, v in pos.items() if v[0]}})
-    return {"day": day.isoformat(), "strategy": strat.name, "index": [{"ts": b["ts"], "c": b["c"]} for b in bars],
-            "fills": fills, "steps": steps, "net": round(sum(t.net for t in res.trades), 2),
+    # the day's P&L each minute (closed + open, net of charges), stamped like the index bars (bar start, IST)
+    pnl = [{"ts": f"{dd} {(555 + m) // 60:02d}:{(555 + m) % 60:02d}:00", "pnl": v} for dd, m, v in bt.curve]
+    return {"day": day.isoformat(), "strategy": strat.name, "underlying": strat.instrument.underlying, "index": [{"ts": b["ts"], "c": b["c"]} for b in bars],
+            "fills": fills, "steps": steps, "pnl": pnl, "net": round(sum(t.net for t in res.trades), 2),
             "diagnostics": {k: v for k, v in res.diagnostics.items() if isinstance(v, (int, float)) and v}}
