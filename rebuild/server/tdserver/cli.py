@@ -1,6 +1,7 @@
 """Admin commands run on the server: `python -m tdserver.cli <command>`.
 
   create-owner-invite NAME   one-time code to enrol the owner's first iPhone (works only while no owner exists)
+  create-device-invite       one-time code to enrol another (or a reinstalled) device for the existing owner
   new-master-key             print a fresh base64 master key for TD2_MASTER_KEY
   check                      check settings and database connection
   live-ordertest             the supervised 1-lot order test (market hours, owner watching; stop td2-live first)
@@ -59,6 +60,17 @@ def main(argv: list[str] | None = None) -> int:
             code = new_invite(db, ctx, name, "owner", None)
             db.commit()
         print(f"Owner invite for {name}: {code}  (valid 3 days, one use)")
+        return 0
+    if cmd == "create-device-invite":
+        # needs a shell on the server, so it is as safe as the server itself; the code is for the owner's own account
+        with ctx.sessions() as db:
+            owner = db.scalar(select(User).where(User.role == "owner").order_by(User.id))
+            if owner is None:
+                print("No owner yet: use create-owner-invite.", file=sys.stderr)
+                return 1
+            code = new_invite(db, ctx, owner.name, owner.role, owner.id, for_user_id=owner.id)
+            db.commit()
+        print(f"Device invite for {owner.name}: {code}  (valid 3 days, one use)")
         return 0
     print(__doc__)
     return 2
