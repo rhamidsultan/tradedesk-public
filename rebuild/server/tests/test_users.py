@@ -165,3 +165,22 @@ def test_every_always_route_passes_the_guard_for_a_login_with_no_access(client, 
         body = {"id": "kill-test-1"} if path.endswith("stop-all") else {"ids": [999999]}
         r = client.request(method, url, headers=h, json=body if method == "POST" else None)
         assert r.status_code != 403, (method, path, r.status_code, r.text)
+
+
+def test_each_login_keeps_its_own_order_of_lists(client, owner, ctx):
+    from conftest import Phone, enroll, sign_in
+    h = owner["h"]
+    assert client.get("/v1/me/lists", headers=h).json() == {}
+    r = client.put("/v1/me/lists/templates", json={"ids": ["orb_nifty", "strangle_nifty", "orb_nifty"]}, headers=h)
+    assert r.json()["ids"] == ["orb_nifty", "strangle_nifty"]                # duplicates dropped
+    client.put("/v1/me/lists/indexes", json={"ids": ["SENSEX", "NIFTY"]}, headers=h)
+    assert client.get("/v1/me/lists", headers=h).json() == {"templates": ["orb_nifty", "strangle_nifty"],
+                                                            "indexes": ["SENSEX", "NIFTY"]}
+    assert client.put("/v1/me/lists/secrets", json={"ids": []}, headers=h).status_code == 404
+    # a family login with no access to any area still arranges its own Home
+    fam = Phone()
+    enroll(client, ctx, fam, role="viewer", name="Mum")
+    hf = {"Authorization": f"Bearer {sign_in(client, fam)}"}
+    assert client.put("/v1/me/lists/home_cards", json={"ids": ["portfolio"]}, headers=hf).status_code == 200
+    assert client.get("/v1/me/lists", headers=hf).json() == {"home_cards": ["portfolio"]}
+    assert "home_cards" not in client.get("/v1/me/lists", headers=h).json()

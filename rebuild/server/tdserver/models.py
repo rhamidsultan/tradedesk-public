@@ -210,6 +210,16 @@ class AuditLog(Base):
     at: Mapped[datetime] = mapped_column(UTCDateTime)
 
 
+class UserList(Base):
+    """A login's own order for a list on the phone (templates, Home cards, index tiles, paper sessions)."""
+
+    __tablename__ = "user_lists"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    name: Mapped[str] = mapped_column(String(32), primary_key=True)
+    ids: Mapped[list] = mapped_column(JSON, default=list)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
 class Setting(Base):
     """Small owner settings stored as JSON (e.g. what the recorder records)."""
 
