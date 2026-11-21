@@ -319,3 +319,23 @@ def test_sweep_ranks_and_checks_out_of_sample(tmp_path):
     assert out["combos"] == 2 and len(out["rows"]) == 2 and "out_of_sample" in out["rows"][0] or "out_of_sample" in out["rows"][1]
     with pytest.raises(ValueError):
         combos({"a": list(range(10)), "b": list(range(10))})
+
+
+def test_minute_pnl_curve_matches_the_day_and_changes_nothing(tmp_path):
+    """Replay's P&L line: one point a minute, the day's figure at the close, and the same trades as without it."""
+    b = Builder(tmp_path / "s")
+    b.spot(D1, flat(25000))
+    b.opt(D1, EXP, 26000, "CE", lambda i: 40.0 if i < 100 else (85.0 if i == 100 else 90.0))
+    b.opt(D1, EXP, 26100, "CE", lambda i: 20.0)
+    b.opt(D1, EXP, 24000, "PE", lambda i: 40.0 - i * 0.02)
+    b.opt(D1, EXP, 23900, "PE", lambda i: 25.0)
+    st = b.build()
+    plain = Backtest(strangle(), StoreFeed(st, "NIFTY")).run(D1, D1)
+    bt = Backtest(strangle(), StoreFeed(st, "NIFTY"))
+    bt.curve = []
+    res = bt.run(D1, D1)
+    assert [(f.ts, f.symbol, f.price) for f in res.fills] == [(f.ts, f.symbol, f.price) for f in plain.fills]
+    assert res.daily == plain.daily
+    assert len(bt.curve) == 375 and bt.curve[-1][2] == pytest.approx(res.daily[0][1], abs=0.05)
+    before_stop = [v for _, m, v in bt.curve if 30 < m < 99]
+    assert before_stop and any(v != before_stop[0] for v in before_stop)   # open P&L moves with the PE price

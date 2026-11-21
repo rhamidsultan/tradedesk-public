@@ -125,6 +125,8 @@ class Backtest:
         self.trades: dict[int, Trade] = {}
         self.fills: list[Fill] = []
         self.daily: list[tuple[str, float]] = []
+        # set to a list to record the day's P&L each minute (closed + open, net of charges): (date, minute, pnl)
+        self.curve: list[tuple[str, int, float]] | None = None
         self.diag = {"days": 0, "days_no_spot": 0, "signals": 0, "entries": 0, "entry_skipped_no_price": 0,
                      "entry_skipped_no_strike": 0, "entry_skipped_no_lot_size": 0, "fills": 0, "stale_fills": 0,
                      "daily_loss_stops": 0, "exits_by_reason": {}}
@@ -505,6 +507,15 @@ class Backtest:
                     if had_open:
                         self.diag["daily_loss_stops"] += 1
                     locked = True
+            if self.curve is not None:            # replay: the same figure the daily loss limit watches
+                mtm_c = 0.0
+                for p in self.positions:
+                    px, _ = self._price_now(p.c, m)
+                    if px is not None:
+                        p.last = px
+                    base = p.mark_base if p.mark_base else p.entry_price
+                    mtm_c += (1 if p.side == "BUY" else -1) * (p.last - base) * p.qty
+                self.curve.append((str(d), m, round(realised_today + mtm_c - self._entry_charges_today, 2)))
             # 5) python strategy on the closed bar (Algo Lab ctx), or no-code signals below
             if self.py is not None:
                 if pyctx is None:

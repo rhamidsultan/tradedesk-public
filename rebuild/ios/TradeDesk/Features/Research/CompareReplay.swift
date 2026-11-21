@@ -98,10 +98,27 @@ struct ReplayView: View {
                 let shown = Array(idx.prefix(upto + 1))
                 let nowTs = shown.last?["ts"]?.string ?? ""
                 let fills = (d["fills"]?.array ?? []).filter { ($0["ts"]?.string ?? "") <= nowTs + "~" }
+                let pnlAll = d["pnl"]?.array ?? []
+                let pnlShown = pnlAll.filter { ($0["ts"]?.string ?? "") <= nowTs + "~" }
+                let sc = ReplayScale(index: idx.compactMap { $0["c"]?.number }, pnl: pnlAll.compactMap { $0["pnl"]?.number })
                 Section {
                     Chart {
                         ForEach(Array(shown.enumerated()), id: \.offset) { _, b in
-                            if let t = Fmt.parseIST(b["ts"]?.string ?? ""), let c = b["c"]?.number { LineMark(x: .value("Time", t), y: .value("Index", c)) }
+                            if let t = Fmt.parseIST(b["ts"]?.string ?? ""), let c = b["c"]?.number {
+                                LineMark(x: .value("Time", t), y: .value("Index", c), series: .value("Line", "Index"))
+                                    .foregroundStyle(Color.secondary)
+                            }
+                        }
+                        // the day's P&L (closed + open, net of charges) drawn on the same chart, read on the right axis
+                        if sc.hasPnl {
+                            RuleMark(y: .value("P&L zero", sc.y(0)))
+                                .foregroundStyle(Color.accentColor.opacity(0.35)).lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                            ForEach(Array(pnlShown.enumerated()), id: \.offset) { _, x in
+                                if let t = Fmt.parseIST(x["ts"]?.string ?? ""), let v = x["pnl"]?.number {
+                                    LineMark(x: .value("Time", t), y: .value("Index", sc.y(v)), series: .value("Line", "P&L"))
+                                        .foregroundStyle(Color.accentColor).lineStyle(StrokeStyle(lineWidth: 2))
+                                }
+                            }
                         }
                         ForEach(Array(fills.enumerated()), id: \.offset) { _, f in
                             if let t = Fmt.parseIST(f["ts"]?.string ?? ""),
@@ -112,9 +129,22 @@ struct ReplayView: View {
                             }
                         }
                     }
-                    .chartYScale(domain: .automatic(includesZero: false))
+                    .chartYScale(domain: sc.lo...sc.hi)
+                    .chartYAxis {
+                        AxisMarks(position: .leading)
+                        if sc.hasPnl {
+                            AxisMarks(position: .trailing, values: sc.pnlTicks.map { sc.y($0) }) { v in
+                                AxisValueLabel {
+                                    if !hide, let y = v.as(Double.self) { Text(Fmt.rupeesShort(sc.pnl(at: y))).foregroundStyle(Color.accentColor) }
+                                }
+                            }
+                        }
+                    }
                     .environment(\.timeZone, Fmt.ist)
-                    .frame(height: 220)
+                    .frame(height: 240)
+                    .accessibilityLabel("Index and the strategy's P&L through the day")
+                    Text("Grey: \(d["underlying"]?.string ?? "index") (left axis) · Blue: P&L incl. open positions, after charges (right axis) · ▲ buy ◆ sell")
+                        .font(.caption2).foregroundStyle(.secondary)
                     HStack {
                         Button { playing.toggle(); if playing { Task { await play() } } } label: {
                             Image(systemName: playing ? "pause.fill" : "play.fill")
@@ -123,9 +153,13 @@ struct ReplayView: View {
                         Slider(value: $minute, in: 0...Double(max(1, idx.count - 1)), step: 1)
                         Text(nowTs.count >= 16 ? String(nowTs.dropFirst(11).prefix(5)) : "—").font(.caption.monospacedDigit())
                     }
-                    let step = (d["steps"]?.array ?? []).last { ($0["ts"]?.string ?? "") <= nowTs + "~" }
-                    LabeledContent("Realised so far", value: Fmt.rupees(step?["realised"]?.number ?? 0, hidden: hide, signed: true))
-                        .monospacedDigit()
+                    let now = pnlShown.last?["pnl"]?.number ?? 0
+                    LabeledContent("P&L at \(nowTs.count >= 16 ? String(nowTs.dropFirst(11).prefix(5)) : "—")") {
+                        Text((now > 0 ? "▲ " : now < 0 ? "▼ " : "") + Fmt.rupees(now, hidden: hide, signed: true))
+                            .foregroundStyle(now > 0 ? Color.tdGood : now < 0 ? Color.tdBad : .primary)
+                    }
+                    .monospacedDigit()
+                    .accessibilityLabel("P&L at this minute, including open positions, after charges: \(Fmt.rupees(now, hidden: hide, signed: true))")
                 } header: { Text("\(d["strategy"]?.string ?? "") · \(Fmt.marketDay(d["day"]?.string)) (IST)") }
                 Section("Orders (\(fills.count))") {
                     ForEach(Array(fills.enumerated()), id: \.offset) { _, f in
@@ -164,5 +198,40 @@ struct ReplayView: View {
             minute = 0
             message = nil
         } catch { message = error.localizedDescription; data = nil }
+    }
+}
+
+
+/// Maps the day's P&L onto the index's scale so both share one chart (index on the left axis, P&L on the right).
+struct ReplayScale {
+    let lo: Double, hi: Double, pmin: Double, pmax: Double
+    let hasPnl: Bool
+
+    init(index: [Double], pnl: [Double]) {
+        let a = index.min() ?? 0, b = index.max() ?? 1
+        let pad = max((b - a) * 0.05, 1)
+        lo = a - pad
+        hi = b + pad
+        hasPnl = !pnl.isEmpty
+        let pa = min(pnl.min() ?? 0, 0), pb = max(pnl.max() ?? 0, 0)        // keep zero in view
+        let ppad = max((pb - pa) * 0.05, 1)
+        pmin = pa - ppad
+        pmax = pb + ppad
+    }
+
+    func y(_ pnl: Double) -> Double { lo + (pnl - pmin) / (pmax - pmin) * (hi - lo) }
+    func pnl(at y: Double) -> Double { pmin + (y - lo) / (hi - lo) * (pmax - pmin) }
+
+    /// Four round P&L values across the range, zero included.
+    var pnlTicks: [Double] {
+        let span = pmax - pmin
+        let raw = span / 3
+        let mag = pow(10, floor(log10(max(raw, 1))))
+        let step = ([1, 2, 5, 10].map { $0 * mag }.first { $0 >= raw }) ?? raw
+        var t = (pmin / step).rounded(.up) * step
+        var out: [Double] = []
+        while t <= pmax && out.count < 8 { out.append(t); t += step }
+        if !out.contains(0) { out.append(0) }
+        return out.sorted()
     }
 }
