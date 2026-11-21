@@ -42,12 +42,14 @@ sudo chown tradedesk:tradedesk $ROOT $ROOT/data $ROOT/store $ROOT/home
 sudo chown root:tradedesk $ROOT/secrets && sudo chmod 750 $ROOT/secrets
 
 say "Code (public repo, main)"
+# the code belongs to tradedesk; let root (Update now) and this login read it too, or git refuses ("dubious ownership")
+sudo git config --system --get-all safe.directory 2>/dev/null | grep -qx $APP || sudo git config --system --add safe.directory $APP
 if [ ! -d $APP/.git ]; then
   as_td git clone -q --branch main "$REPO" $APP
 else
   as_td git -C $APP fetch -q origin main && as_td git -C $APP checkout -q --detach origin/main
 fi
-VERSION=$(git -C $APP rev-parse --short HEAD); echo "  version $VERSION"
+VERSION=$(as_td git -C $APP rev-parse --short HEAD); echo "  version $VERSION"
 
 say "Python environment (a few minutes the first time)"
 [ -x $VENV/bin/python ] || { sudo mkdir -p $VENV && sudo chown tradedesk:tradedesk $VENV && as_td python3 -m venv $VENV; }
