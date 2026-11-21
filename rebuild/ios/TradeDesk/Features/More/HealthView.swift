@@ -94,8 +94,13 @@ struct ServerVersionSection: View {
         .task { await load() }
     }
 
-    private func load() async {
-        do { v = try await model.api.get("/v1/system/version") } catch { message = error.localizedDescription }
+    private func load(quiet: Bool = false) async {
+        do {
+            v = try await model.api.get("/v1/system/version")
+            if !quiet { message = nil }
+        } catch {
+            if !quiet { message = error.localizedDescription }   // while it restarts (502) the server is briefly away
+        }
     }
 
     private func update() async {
@@ -105,9 +110,10 @@ struct ServerVersionSection: View {
             message = r.note
             for _ in 0..<40 {                               // follow it for up to 2 minutes
                 try? await Task.sleep(for: .seconds(3))
-                await load()
-                if let s = v?.lastUpdate?.state, s != "running", v?.requested == false { break }
+                await load(quiet: true)
+                if let s = v?.lastUpdate?.state, s != "running", v?.requested == false { message = nil; break }
             }
+            if message != nil { await load() }
         } catch { message = error.localizedDescription }
     }
 }

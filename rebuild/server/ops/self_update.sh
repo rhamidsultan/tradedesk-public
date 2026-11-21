@@ -3,6 +3,11 @@
 # Run as root by td2-selfupdate.service when the API writes /opt/td2/data/update-request.
 # Database migrations must only add (never drop) so that a code rollback keeps working.
 set -uo pipefail
+# git checkout below rewrites this very file, and bash reads a script as it runs: run from a copy
+if [ -z "${TD2_SELFUPDATE_COPY:-}" ]; then
+  copy=$(mktemp /tmp/td2-self-update.XXXXXX.sh) && cp "$0" "$copy" && TD2_SELFUPDATE_COPY="$copy" exec bash "$copy" "$@"
+fi
+trap 'rm -f "${TD2_SELFUPDATE_COPY:-}"' EXIT
 APP=/opt/td2/app
 VENV=/opt/td2/venv
 DATA=/opt/td2/data
@@ -12,13 +17,13 @@ ALL_SERVICES="td2-api td2-worker td2-recorder td2-jobs td2-paper td2-live td2-po
 SERVICES="$(for s in $ALL_SERVICES; do systemctl cat "$s" >/dev/null 2>&1 && printf '%s ' "$s"; done)"
 as_td() { sudo -u tradedesk -H "$@"; }
 status() { printf '{"state":"%s","detail":"%s","from":"%s","to":"%s","at":"%s"}\n' "$1" "$2" "${FROM:-}" "${TO:-}" "$(date -Is)" > "$STATUS.tmp" && mv "$STATUS.tmp" "$STATUS" && chown tradedesk "$STATUS"; }
-install() {   # migrations run when td2-api starts (ExecStartPre: alembic upgrade head)
+pip_install() {   # migrations run when td2-api starts (ExecStartPre: alembic upgrade head)
   as_td "$VENV/bin/pip" install -q -e "$APP/py/marketcal" -e "$APP/py/marketdata" -e "$APP/py/spec" \
       -e "$APP/py/strategies" -e "$APP/py/engine" -e "$APP/py/oms" -e "$APP/rebuild/server[postgres]"
 }
 units() {     # the service files of the version being installed (memory limits etc. change with the code)
   for f in "$APP"/rebuild/server/ops/td2-*.service "$APP"/rebuild/server/ops/td2-*.timer "$APP"/rebuild/server/ops/td2-*.path; do
-    [ -f "$f" ] && install -m 644 "$f" /etc/systemd/system/
+    [ -f "$f" ] && /usr/bin/install -m 644 "$f" /etc/systemd/system/
   done
   systemctl daemon-reload
 }
@@ -38,13 +43,13 @@ TO=$(git rev-parse origin/main)
 if [ "$FROM" = "$TO" ]; then status done "Already up to date"; exit 0; fi
 as_td git -C "$APP" checkout -q --detach "$TO" || { status failed "Checkout failed"; exit 1; }
 sed -i "s/^TD2_VERSION=.*/TD2_VERSION=${TO:0:7}/" /opt/td2/secrets/td2.env || true
-if install && units && systemctl restart $SERVICES && healthy; then
+if pip_install && units && systemctl restart $SERVICES && healthy; then
   status done "Updated"
   exit 0
 fi
 status running "Rolling back"
 as_td git -C "$APP" checkout -q --detach "$FROM"
 sed -i "s/^TD2_VERSION=.*/TD2_VERSION=${FROM:0:7}/" /opt/td2/secrets/td2.env || true
-install; units; systemctl restart $SERVICES
+pip_install; units; systemctl restart $SERVICES
 if healthy; then status rolled_back "The new version did not start; the old one is back"; else status failed "Rollback did not start either: check the server"; fi
 exit 1
