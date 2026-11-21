@@ -219,3 +219,24 @@ def test_a_run_that_cannot_start_fails_instead_of_staying_queued(ctx, owner, res
     with ctx.sessions() as db:
         r = db.get(BacktestRun, rid)
         assert r.status == "failed" and "could not start" in r.note
+
+
+def test_a_run_killed_for_memory_says_so(ctx, owner, research, monkeypatch):
+    import subprocess
+    from types import SimpleNamespace
+
+    from tdserver.models import BacktestRun
+    from tdserver.research import jobs
+
+    monkeypatch.setattr(jobs.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=-9))
+    with ctx.sessions() as db:
+        r = BacktestRun(user_id=1, name="x", underlying="NIFTY", spec={}, start=D1, end=D2, status="running",
+                        created_at=ctx.clock.now())
+        db.add(r)
+        db.commit()
+        rid = r.id
+    jobs._launch(ctx, rid)
+    with ctx.sessions() as db:
+        r = db.get(BacktestRun, rid)
+        assert r.status == "failed" and "more memory" in r.note
+    assert subprocess  # (module used by jobs)

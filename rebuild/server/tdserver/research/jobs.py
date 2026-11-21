@@ -58,8 +58,9 @@ def tick(ctx: AppContext, launch=None) -> str:
 
 def _launch(ctx: AppContext, run_id: int) -> None:
     def limit():
-        # Linux (the server): a hard memory cap. macOS (the Mac trial) does not support RLIMIT_AS and would refuse
-        # to start the child at all, leaving the run queued for ever; there the timeout alone applies.
+        # Memory is capped by td2-jobs.service (MemoryMax, real memory used). An address-space cap (RLIMIT_AS)
+        # counted memory DuckDB and Python only reserve, and failed backtests with "out of memory" on a server
+        # that had room. The child gets the same cgroup; if it outgrows it, only the child is killed.
         import resource
         try:                    # backtests read thousands of small daily files: lift a low open-file limit
             soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
@@ -68,16 +69,14 @@ def _launch(ctx: AppContext, run_id: int) -> None:
                 resource.setrlimit(resource.RLIMIT_NOFILE, (want, hard))
         except (ValueError, OSError):
             pass
-        if sys.platform != "linux":
-            return
-        mb = ctx.settings.backtest_memory_mb
-        resource.setrlimit(resource.RLIMIT_AS, (mb * 2 ** 20, mb * 2 ** 20))
-    note = "Stopped: ran out of time or memory. Try a shorter date range."
+    note = "Stopped: the run did not finish. Try a shorter date range."
     try:
-        subprocess.run([sys.executable, "-m", "tdserver.research.runone", str(run_id)], preexec_fn=limit,
-                       timeout=ctx.settings.backtest_timeout_s, check=False)
+        rc = subprocess.run([sys.executable, "-m", "tdserver.research.runone", str(run_id)], preexec_fn=limit,
+                            timeout=ctx.settings.backtest_timeout_s, check=False).returncode
+        if rc in (-9, 137):
+            note = "Stopped: it needed more memory than the server allows one backtest. Try a shorter date range."
     except subprocess.TimeoutExpired:
-        pass
+        note = f"Stopped: it ran longer than {ctx.settings.backtest_timeout_s // 60} minutes. Try a shorter date range."
     except (OSError, subprocess.SubprocessError) as e:      # could not start: fail the run, never loop on it
         log.error("backtest %s could not start: %s", run_id, type(e).__name__)
         note = "The server could not start this backtest. Check the jobs log."

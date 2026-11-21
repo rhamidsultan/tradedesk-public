@@ -16,6 +16,12 @@ install() {   # migrations run when td2-api starts (ExecStartPre: alembic upgrad
   as_td "$VENV/bin/pip" install -q -e "$APP/py/marketcal" -e "$APP/py/marketdata" -e "$APP/py/spec" \
       -e "$APP/py/strategies" -e "$APP/py/engine" -e "$APP/py/oms" -e "$APP/rebuild/server[postgres]"
 }
+units() {     # the service files of the version being installed (memory limits etc. change with the code)
+  for f in "$APP"/rebuild/server/ops/td2-*.service "$APP"/rebuild/server/ops/td2-*.timer "$APP"/rebuild/server/ops/td2-*.path; do
+    [ -f "$f" ] && install -m 644 "$f" /etc/systemd/system/
+  done
+  systemctl daemon-reload
+}
 healthy() {
   for _ in $(seq 1 30); do
     curl -fsS http://127.0.0.1:8720/v1/health >/dev/null 2>&1 && return 0
@@ -32,13 +38,13 @@ TO=$(git rev-parse origin/main)
 if [ "$FROM" = "$TO" ]; then status done "Already up to date"; exit 0; fi
 as_td git -C "$APP" checkout -q --detach "$TO" || { status failed "Checkout failed"; exit 1; }
 sed -i "s/^TD2_VERSION=.*/TD2_VERSION=${TO:0:7}/" /opt/td2/secrets/td2.env || true
-if install && systemctl restart $SERVICES && healthy; then
+if install && units && systemctl restart $SERVICES && healthy; then
   status done "Updated"
   exit 0
 fi
 status running "Rolling back"
 as_td git -C "$APP" checkout -q --detach "$FROM"
 sed -i "s/^TD2_VERSION=.*/TD2_VERSION=${FROM:0:7}/" /opt/td2/secrets/td2.env || true
-install; systemctl restart $SERVICES
+install; units; systemctl restart $SERVICES
 if healthy; then status rolled_back "The new version did not start; the old one is back"; else status failed "Rollback did not start either: check the server"; fi
 exit 1
