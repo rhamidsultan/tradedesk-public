@@ -284,6 +284,7 @@ class StrategyDoc(Base):
     share_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
     stage: Mapped[str] = mapped_column(String(16), default="research", server_default="research")  # research|paper|shadow|live
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    position: Mapped[int | None] = mapped_column(Integer, nullable=True)   # the owner's order; new ones (None) first
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime)
 

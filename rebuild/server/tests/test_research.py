@@ -278,3 +278,20 @@ def test_backtest_uses_stored_1_second_bars_and_checks_them_against_the_minute(c
     ch = row["changed_exits"][0]
     assert ch["minute"]["ts"].endswith("10:55:00") and ch["second"]["ts"].endswith("10:55:30")
     assert ch["second"]["price"] < ch["minute"]["price"] and row["diff"] > 0      # a short stopped earlier: smaller loss
+
+
+def test_a_failed_run_is_deleted_even_if_its_result_file_cannot_be_removed(client, owner, research, monkeypatch):
+    """On the server the API could not write the store's runs folder: deleting must still work."""
+    from pathlib import Path
+    h = owner["h"]
+    run = client.post("/v1/research/backtests", json={"template": "strangle_nifty", "start": "2026-10-12",
+                                                      "end": "2026-10-13"}, headers=h).json()
+    with research.sessions() as db:
+        db.get(BacktestRun, run["id"]).status = "failed"
+        db.commit()
+
+    def ro(self, missing_ok=False):
+        raise OSError(30, "Read-only file system")
+    monkeypatch.setattr(Path, "unlink", ro)
+    assert client.delete(f"/v1/research/backtests/{run['id']}", headers=h).json()["ok"] is True
+    assert client.get(f"/v1/research/backtests/{run['id']}", headers=h).status_code == 404

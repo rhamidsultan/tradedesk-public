@@ -12,7 +12,8 @@ Restart=on-failure
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/td2/data
+# backtest results live in the store's runs folder: the API deletes them (the "-" skips it if not made yet)
+ReadWritePaths=/opt/td2/data -/opt/td2/store/runs
 PrivateTmp=true
 
 [Install]
