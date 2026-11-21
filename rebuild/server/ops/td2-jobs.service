@@ -10,6 +10,11 @@ ExecStart=/opt/td2/venv/bin/python -m tdserver.research.jobs
 Restart=always
 RestartSec=5
 Nice=10
+# real memory for the queue and the one backtest it runs; past MemoryHigh it is slowed, past MemoryMax the backtest
+# is stopped (and marked so), never the rest of the server. Fewer malloc arenas keep Python's memory compact.
+Environment=MALLOC_ARENA_MAX=2
+MemoryHigh=1000M
+MemoryMax=1300M
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

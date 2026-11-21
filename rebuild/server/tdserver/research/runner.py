@@ -52,7 +52,7 @@ def run_one(ctx: AppContext, run_id: int) -> str:
         return _run_sweep(ctx, run_id, spec, start, end, params)
     try:
         strat = Strategy.model_validate(spec)
-        store = Store(ctx.settings.store_root, memory_limit=ctx.settings.duckdb_memory)
+        store = Store(ctx.settings.store_root, memory_limit=f"{ctx.settings.backtest_duckdb_mb}MB", threads=1)
         feed = StoreFeed(store, strat.instrument.underlying)
         days = feed.dates(start, end)
         total = max(1, len(days))
@@ -195,7 +195,7 @@ def _run_sweep(ctx: AppContext, run_id: int, spec: dict, start, end, params: dic
             r.progress = int(frac * 100)
             db.commit()
     try:
-        store = Store(ctx.settings.store_root, memory_limit=ctx.settings.duckdb_memory)
+        store = Store(ctx.settings.store_root, memory_limit=f"{ctx.settings.backtest_duckdb_mb}MB", threads=1)
         grid = params["grid"]
         split = _date.fromisoformat(params["split"])
         res = sw.run_sweep(spec, grid, start, split, end, store, folds=int(params.get("folds") or 0), progress=progress)
