@@ -108,8 +108,24 @@ def _doc_out(db: Session, d: StrategyDoc) -> dict:
 @router.get("")
 def mine(archived: bool = False, p: Principal = Depends(current), db: Session = Depends(get_db)):
     rows = db.scalars(select(StrategyDoc).where(StrategyDoc.user_id == p.user.id, StrategyDoc.archived == archived)
-                      .order_by(StrategyDoc.updated_at.desc())).all()
+                      .order_by(StrategyDoc.position.is_not(None), StrategyDoc.position, StrategyDoc.updated_at.desc())).all()
     return [_doc_out(db, d) for d in rows]
+
+
+class OrderIn(BaseModel):
+    ids: list[int] = Field(..., min_length=1, max_length=500, description="the trader's strategies, top first")
+
+
+@router.put("/order")
+def reorder(body: OrderIn, p: Principal = Depends(current), db: Session = Depends(get_db)):
+    """Save the order of My strategies. Only the caller's own strategies are touched; others in the list are ignored."""
+    own = {d.id: d for d in db.scalars(select(StrategyDoc).where(StrategyDoc.user_id == p.user.id,
+                                                                 StrategyDoc.id.in_(body.ids))).all()}
+    for i, sid in enumerate(dict.fromkeys(body.ids)):
+        if sid in own:
+            own[sid].position = i
+    db.flush()
+    return {"ok": True, "ordered": len(own)}
 
 
 class NewIn(BaseModel):

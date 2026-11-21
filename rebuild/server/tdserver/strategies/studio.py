@@ -216,7 +216,7 @@ def promote(sid: int, request: Request, p: Principal = Depends(trader), ctx: App
 @router.get("/studio/list")
 def studio(p: Principal = Depends(current), ctx: AppContext = Depends(get_ctx), db: Session = Depends(get_db)):
     rows = db.scalars(select(StrategyDoc).where(StrategyDoc.user_id == p.user.id, StrategyDoc.archived.is_(False))
-                      .order_by(StrategyDoc.updated_at.desc())).all()
+                      .order_by(StrategyDoc.position.is_not(None), StrategyDoc.position, StrategyDoc.updated_at.desc())).all()
     out = []
     for d in rows:
         n = len(db.scalars(select(StrategyPreset.id).where(StrategyPreset.strategy_id == d.id)).all())

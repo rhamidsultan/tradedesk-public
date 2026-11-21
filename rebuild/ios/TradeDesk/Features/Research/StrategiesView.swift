@@ -15,6 +15,8 @@ struct StrategiesView: View {
     @State private var showStarred = false
     @State private var poll: Task<Void, Never>?
     @State private var loaded = false
+    @State private var editMode: EditMode = .inactive
+    @State private var confirmDelete: BacktestRunItem?
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -24,11 +26,35 @@ struct StrategiesView: View {
                     if mine.isEmpty && loaded {
                         Text("None yet. Customise a template below or start blank.").foregroundStyle(.secondary)
                     }
-                    ForEach(Array(mine.enumerated()), id: \.offset) { _, d in
+                    ForEach(mine, id: \.self) { d in
                         Button { path.append(StrategyRoute.strategy(Int(d["id"]?.number ?? 0))) } label: { MyStrategyRow(doc: d) }
                             .buttonStyle(.plain)
+                            .swipeActions(edge: .leading) {
+                                if mine.first != d {
+                                    Button("Move to top", systemImage: "arrow.up.to.line") { moveToTop(d) }.tint(.blue)
+                                }
+                            }
                     }
-                } header: { Text("My strategies") }
+                    .onMove { from, to in
+                        mine.move(fromOffsets: from, toOffset: to)
+                        Task { await saveOrder() }
+                    }
+                } header: {
+                    HStack {
+                        Text("My strategies")
+                        Spacer()
+                        if mine.count > 1 {
+                            Button(editMode.isEditing ? "Done" : "Reorder") {
+                                withAnimation { editMode = editMode.isEditing ? .inactive : .active }
+                            }
+                            .font(.subheadline).textCase(nil)
+                        }
+                    }
+                } footer: {
+                    if mine.count > 1 && !editMode.isEditing {
+                        Text("Tap Reorder and drag ≡ to arrange, or swipe right on one to move it to the top.")
+                    }
+                }
                 Section {
                     Picker("Runs", selection: $showStarred) { Text("All runs").tag(false); Text("Starred").tag(true) }
                         .pickerStyle(.segmented)
@@ -45,6 +71,9 @@ struct StrategiesView: View {
                                     Task { await star(r) }
                                 }.tint(.yellow)
                                 Button("Archive", systemImage: "archivebox") { Task { await archive(r) } }
+                                if r.status != "running" {
+                                    Button("Delete", systemImage: "trash", role: .destructive) { confirmDelete = r }
+                                }
                             }
                     }
                 } header: { Text("Backtests") }
@@ -80,6 +109,12 @@ struct StrategiesView: View {
                     }
                 }
             }
+            .environment(\.editMode, $editMode)
+            .confirmationDialog("Delete this backtest?", isPresented: Binding(get: { confirmDelete != nil },
+                                                                               set: { if !$0 { confirmDelete = nil } }),
+                                titleVisibility: .visible, presenting: confirmDelete) { r in
+                Button("Delete", role: .destructive) { Task { await delete(r) } }
+            } message: { r in Text("\(r.name). Its results go too; this cannot be undone.") }
             .navigationTitle("Strategies")
             .toolbar {
                 Menu {
@@ -163,6 +198,29 @@ struct StrategiesView: View {
     private func star(_ r: BacktestRunItem) async {
         struct B: Encodable { let starred: Bool }
         let _: BacktestRunItem? = try? await model.api.patch("/v1/research/backtests/\(r.id)", B(starred: !r.starred))
+        await loadRuns()
+    }
+
+    private func moveToTop(_ d: JSONValue) {
+        guard let i = mine.firstIndex(of: d) else { return }
+        withAnimation { mine.move(fromOffsets: IndexSet(integer: i), toOffset: 0) }
+        Task { await saveOrder() }
+    }
+
+    private func saveOrder() async {
+        struct B: Encodable { let ids: [Int] }
+        struct R: Decodable { let ok: Bool }
+        do {
+            let _: R = try await model.api.put("/v1/strategies/order", B(ids: mine.compactMap { $0["id"]?.number.map(Int.init) }))
+        } catch { self.error = "Order not saved: \(error.localizedDescription)" }
+    }
+
+    private func delete(_ r: BacktestRunItem) async {
+        struct R: Decodable { let ok: Bool }
+        do {
+            let _: R = try await model.api.send("DELETE", "/v1/research/backtests/\(r.id)", body: Optional<String>.none)
+            error = nil
+        } catch { self.error = error.localizedDescription }
         await loadRuns()
     }
 

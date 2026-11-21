@@ -1,6 +1,8 @@
 """Backtests from the app: templates, asking for a run, saved runs, results, trades with their fills."""
 from __future__ import annotations
 
+import logging
+
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -13,6 +15,7 @@ from ..deps import Principal, audit, client_ip, current, get_ctx, get_db, rate_l
 from ..models import BacktestRun
 from .runner import load_result, result_path
 
+log = logging.getLogger("tdserver.research")
 router = APIRouter(prefix="/v1/research")
 MAX_QUEUED = 10
 HONEST = {"fill_model": "honest"}
@@ -217,7 +220,10 @@ def delete(run_id: int, request: Request, p: Principal = Depends(current), ctx: 
     r = _own(db, p, run_id)
     if r.status == "running":
         raise HTTPException(409, "Cancel it first.")
-    result_path(ctx, run_id).unlink(missing_ok=True)
+    try:
+        result_path(ctx, run_id).unlink(missing_ok=True)
+    except OSError as e:          # the result file could not be removed: still forget the run (the file is orphaned)
+        log.warning("backtest %s: result file not removed: %s", run_id, e)
     db.delete(r)
     audit(db, ctx, p.user.id, "backtest.delete", f"run:{run_id}", client_ip(request))
     return {"ok": True}

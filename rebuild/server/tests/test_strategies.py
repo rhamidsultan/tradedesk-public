@@ -223,3 +223,22 @@ def test_preset_that_raises_risk_needs_acceptance(client, owner):
     assert r.status_code == 409 and r.json()["detail"]["accept_required"] == 50000
     ok = client.post(f"/v1/strategies/{sid}/presets", json={"name": "Big", "overrides": big, "accept_risk": 50000}, headers=h)
     assert ok.status_code == 200, ok.text
+
+
+def test_my_strategies_keep_the_order_the_trader_sets_and_new_ones_come_first(client, owner, ctx):
+    from conftest import Phone, enroll, sign_in
+    h = owner["h"]
+    ids = [client.post("/v1/strategies", json={"template": "strangle_nifty", "name": n}, headers=h).json()["id"]
+           for n in ("A", "B", "C")]
+    a, b, c = ids
+    assert client.put("/v1/strategies/order", json={"ids": [b, c, a]}, headers=h).json()["ordered"] == 3
+    assert [d["id"] for d in client.get("/v1/strategies", headers=h).json()] == [b, c, a]
+    new = client.post("/v1/strategies", json={"template": "strangle_nifty", "name": "D"}, headers=h).json()["id"]
+    assert [d["id"] for d in client.get("/v1/strategies", headers=h).json()] == [new, b, c, a]
+    # someone else's strategy in the list is ignored, never reordered
+    other = Phone()
+    enroll(client, ctx, other, role="trader", name="Sis")
+    ho = {"Authorization": f"Bearer {sign_in(client, other)}"}
+    theirs = client.post("/v1/strategies", json={"template": "strangle_nifty"}, headers=ho).json()["id"]
+    assert client.put("/v1/strategies/order", json={"ids": [theirs, a]}, headers=h).json()["ordered"] == 1
+    assert [d["id"] for d in client.get("/v1/strategies", headers=ho).json()] == [theirs]
