@@ -534,6 +534,7 @@ struct ScrubSection: View {
                     }
                 }
             }
+            .istTimeAxis()
             .environment(\.timeZone, Fmt.ist)
             .frame(height: 220)
             .accessibilityLabel("Index and the session's P&L up to \(clock(m))")

@@ -140,6 +140,7 @@ struct ReplayView: View {
                             }
                         }
                     }
+                    .istTimeAxis()
                     .environment(\.timeZone, Fmt.ist)
                     .frame(height: 240)
                     .accessibilityLabel("Index and the strategy's P&L through the day")

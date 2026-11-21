@@ -28,6 +28,7 @@ struct ContractView: View {
                         }
                     }
                     .chartYScale(domain: .automatic(includesZero: false))
+                    .istTimeAxis()
                     .environment(\.timeZone, Fmt.ist)
                     .frame(height: 220)
                 }
