@@ -12,23 +12,39 @@ struct StrategiesView: View {
     @State private var path = NavigationPath()
     @State private var runs: [BacktestRunItem] = []
     @State private var error: String?
-    @State private var showStarred = false
     @State private var poll: Task<Void, Never>?
     @State private var loaded = false
     @State private var editMode: EditMode = .inactive
-    @State private var confirmDelete: BacktestRunItem?
 
     var body: some View {
         NavigationStack(path: $path) {
             List {
                 if let error { Label(error, systemImage: "wifi.slash").foregroundStyle(Color.tdWarn) }
                 Section {
+                    NavigationLink(value: StrategyRoute.backtests(nil, nil)) {
+                        Label {
+                            HStack {
+                                Text("Backtest results")
+                                Spacer()
+                                if !runs.isEmpty { Text("\(runs.count)").foregroundStyle(.secondary).monospacedDigit() }
+                                if runs.contains(where: { $0.status == "queued" || $0.status == "running" }) {
+                                    ProgressView().controlSize(.small)
+                                }
+                            }
+                        } icon: { Image(systemName: "chart.bar.doc.horizontal") }
+                    }
+                }
+                Section {
                     if mine.isEmpty && loaded {
                         Text("None yet. Customise a template below or start blank.").foregroundStyle(.secondary)
                     }
                     ForEach(mine, id: \.self) { d in
-                        Button { path.append(StrategyRoute.strategy(Int(d["id"]?.number ?? 0))) } label: { MyStrategyRow(doc: d) }
-                            .buttonStyle(.plain)
+                        Button { path.append(StrategyRoute.strategy(Int(d["id"]?.number ?? 0))) } label: {
+                            MyStrategyRow(doc: d) {
+                                path.append(StrategyRoute.backtests(Int(d["id"]?.number ?? 0), d["name"]?.string))
+                            }
+                        }
+                        .buttonStyle(.plain)
                             .swipeActions(edge: .leading) {
                                 if mine.first != d {
                                     Button("Move to top", systemImage: "arrow.up.to.line") { moveToTop(d) }.tint(.blue)
@@ -55,28 +71,6 @@ struct StrategiesView: View {
                         Text("Tap Reorder and drag ≡ to arrange, or swipe right on one to move it to the top.")
                     }
                 }
-                Section {
-                    Picker("Runs", selection: $showStarred) { Text("All runs").tag(false); Text("Starred").tag(true) }
-                        .pickerStyle(.segmented)
-                    if !loaded {
-                        ProgressView()
-                    } else if runs.isEmpty {
-                        Text(showStarred ? "No starred runs. Swipe a run to star it." : "No backtests yet. Pick a template below.")
-                            .foregroundStyle(.secondary)
-                    }
-                    ForEach(runs) { r in
-                        NavigationLink(value: r) { RunRow(run: r) }
-                            .swipeActions {
-                                Button(r.starred ? "Unstar" : "Star", systemImage: r.starred ? "star.slash" : "star") {
-                                    Task { await star(r) }
-                                }.tint(.yellow)
-                                Button("Archive", systemImage: "archivebox") { Task { await archive(r) } }
-                                if r.status != "running" {
-                                    Button("Delete", systemImage: "trash", role: .destructive) { confirmDelete = r }
-                                }
-                            }
-                    }
-                } header: { Text("Backtests") }
                 let groups = Dictionary(grouping: gallery) { $0["category"]?.string ?? "Other" }
                 ForEach(groups.keys.sorted(), id: \.self) { cat in
                     Section(cat) {
@@ -110,11 +104,6 @@ struct StrategiesView: View {
                 }
             }
             .environment(\.editMode, $editMode)
-            .confirmationDialog("Delete this backtest?", isPresented: Binding(get: { confirmDelete != nil },
-                                                                               set: { if !$0 { confirmDelete = nil } }),
-                                titleVisibility: .visible, presenting: confirmDelete) { r in
-                Button("Delete", role: .destructive) { Task { await delete(r) } }
-            } message: { r in Text("\(r.name). Its results go too; this cannot be undone.") }
             .navigationTitle("Strategies")
             .toolbar {
                 Menu {
@@ -137,13 +126,14 @@ struct StrategiesView: View {
                 case .editor(let id): StrategyEditor(strategyID: id)
                 case .sweep(let template): SweepFormView(template: template, specFromRun: nil)
                 case .replay(let template): ReplayView(template: template)
+                case .backtests(let sid, let name): BacktestsView(strategyID: sid, strategyName: name)
                 }
             }
             .navigationDestination(for: BacktestRunItem.self) { r in
                 if r.kind == "sweep" { SweepResultView(runID: r.id) } else { ResultView(runID: r.id) }
             }
             .navigationDestination(for: TradeItem.self) { t in TradeDetailView(trade: t) }
-            .task(id: showStarred) { await load() }
+            .task { await load() }
             .onChange(of: model.tab) { _, t in if t == .strategies { Task { await loadRuns() } } }
             .refreshable { await load() }
             .onAppear { startPolling() }
@@ -190,15 +180,9 @@ struct StrategiesView: View {
     }
 
     private func loadRuns() async {
-        do { runs = try await model.api.get("/v1/research/backtests\(showStarred ? "?starred=true" : "")"); error = nil }
+        do { runs = try await model.api.get("/v1/research/backtests"); error = nil }
         catch { self.error = error.localizedDescription }
         loaded = true
-    }
-
-    private func star(_ r: BacktestRunItem) async {
-        struct B: Encodable { let starred: Bool }
-        let _: BacktestRunItem? = try? await model.api.patch("/v1/research/backtests/\(r.id)", B(starred: !r.starred))
-        await loadRuns()
     }
 
     private func moveToTop(_ d: JSONValue) {
@@ -215,20 +199,6 @@ struct StrategiesView: View {
         } catch { self.error = "Order not saved: \(error.localizedDescription)" }
     }
 
-    private func delete(_ r: BacktestRunItem) async {
-        struct R: Decodable { let ok: Bool }
-        do {
-            let _: R = try await model.api.send("DELETE", "/v1/research/backtests/\(r.id)", body: Optional<String>.none)
-            error = nil
-        } catch { self.error = error.localizedDescription }
-        await loadRuns()
-    }
-
-    private func archive(_ r: BacktestRunItem) async {
-        struct B: Encodable { let archived: Bool }
-        let _: BacktestRunItem? = try? await model.api.patch("/v1/research/backtests/\(r.id)", B(archived: true))
-        await loadRuns()
-    }
 }
 
 enum StrategyRoute: Hashable {
@@ -237,11 +207,13 @@ enum StrategyRoute: Hashable {
     case editor(Int)
     case sweep(String)
     case replay(String)
+    case backtests(Int?, String?)        // the results page, for one strategy or all
 }
 
 struct MyStrategyRow: View {
     @AppStorage("hideAmounts") private var hide = false
     let doc: JSONValue
+    var showBacktests: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -259,10 +231,19 @@ struct MyStrategyRow: View {
                     Text("Last backtest \(Fmt.rupees(net, hidden: hide, signed: true))").font(.caption.monospacedDigit())
                         .foregroundStyle(net >= 0 ? Color.tdGood : Color.tdBad)
                 }
+                Spacer()
+                let n = Int(doc["backtests"]?.number ?? 0)
+                if n > 0, let showBacktests {
+                    Button(action: showBacktests) {
+                        Label("Backtests (\(n))", systemImage: "chart.bar.doc.horizontal").font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("\(n) backtest results for \(doc["name"]?.string ?? "this strategy")")
+                }
             }
         }
         .contentShape(.rect)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 }
 

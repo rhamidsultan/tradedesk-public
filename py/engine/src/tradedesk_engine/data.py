@@ -142,11 +142,17 @@ class StoreFeed:
         self.seconds = seconds          # settle stops and targets on 1-second bars where they are stored
 
     def dates(self, start: date, end: date) -> list[date]:
-        g = self.store.bars_glob("idx", self.u)
-        rows = self.con.execute(
-            f"SELECT DISTINCT date FROM read_parquet('{g}', hive_partitioning=true, union_by_name=true) "
-            f"WHERE source IN ('truedata', 'kite_live') AND date BETWEEN DATE '{start}' AND DATE '{end}' ORDER BY 1").fetchall()
-        return [r[0] for r in rows]
+        """Days with index bars (TrueData or the live recorder), from the folder names: reading every file's dates
+        through DuckDB ran out of memory on the 2 GB server."""
+        out = []
+        for p in (self.store.root / "bars_1m" / "idx" / self.u).glob("date=*"):
+            try:
+                d = date.fromisoformat(p.name[5:])
+            except ValueError:
+                continue
+            if start <= d <= end and (any(p.glob("truedata_*.parquet")) or any(p.glob("kite_live_*.parquet"))):
+                out.append(d)
+        return sorted(out)
 
     def _series(self, rows) -> Series:
         m = np.array([minute_of(r[0].time()) for r in rows], dtype=np.int32)

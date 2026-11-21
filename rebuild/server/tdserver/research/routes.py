@@ -138,8 +138,10 @@ def create(body: RunIn, request: Request, p: Principal = Depends(trader), ctx: A
 
 @router.get("/backtests")
 def list_runs(archived: bool = False, starred: bool = False, template: str | None = None,
-              p: Principal = Depends(current), db: Session = Depends(get_db)):
+              strategy_id: int | None = None, p: Principal = Depends(current), db: Session = Depends(get_db)):
     q = select(BacktestRun).where(BacktestRun.user_id == p.user.id, BacktestRun.archived == archived)
+    if strategy_id is not None:
+        q = q.where(BacktestRun.strategy_id == strategy_id)
     if starred:
         q = q.where(BacktestRun.starred)
     if template:

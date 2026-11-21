@@ -85,6 +85,12 @@ def test_versions_restore_and_backtest(client, owner):
     assert run["status"] == "queued" and run["name"].endswith("v2") and run["fill_model"] == "honest"
     mine = client.get("/v1/strategies", headers=h).json()
     assert mine[0]["id"] == sid and mine[0]["version"] == 2 and mine[0]["has_draft"] is True
+    assert mine[0]["backtests"] == 1                                   # the link to its results shows the count
+    other = client.post("/v1/research/backtests", json={"template": "strangle_nifty", "start": "2026-10-12",
+                                                        "end": "2026-10-13"}, headers=h).json()
+    only = client.get(f"/v1/research/backtests?strategy_id={sid}", headers=h).json()
+    assert [r["id"] for r in only] == [run["id"]] and other["id"] in [r["id"] for r in
+                                                                     client.get("/v1/research/backtests", headers=h).json()]
 
 
 def test_share_and_import_with_changes(client, owner, ctx):

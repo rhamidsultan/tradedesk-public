@@ -8,7 +8,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..context import AppContext
@@ -102,7 +102,9 @@ def _doc_out(db: Session, d: StrategyDoc) -> dict:
     return {"id": d.id, "name": d.name, "kind": d.kind, "template": d.template, "version": d.current_version,
             "stage": d.stage,
             "has_draft": d.draft is not None, "archived": d.archived, "updated_at": d.updated_at.isoformat(),
-            "last_backtest": _last_backtest(db, d.id)}
+            "last_backtest": _last_backtest(db, d.id),
+            "backtests": db.scalar(select(func.count(BacktestRun.id)).where(BacktestRun.strategy_id == d.id,
+                                                                          BacktestRun.archived.is_(False))) or 0}
 
 
 @router.get("")
