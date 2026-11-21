@@ -42,7 +42,9 @@ struct ResultView: View {
                     case 0: curveSections
                     case 1: breakdowns(m)
                     case 2: risk(m)
-                    default: if let a = d.audit { audit(a, m) }
+                    default:
+                        if let a = d.audit { audit(a, m) }
+                        if let c = d.secondsCheck { SecondsCheckSection(check: c) }
                     }
                     tradesSection
                 }
@@ -216,6 +218,14 @@ struct ResultView: View {
             row("Orders over 10% of volume", a.fills.over10pctOfVolume.map { "\($0)" })
             row("Index move over the run", m.indexMovePct.map { String(format: "%+.1f%%", $0) })
             ForEach(a.skipped.keys.sorted(), id: \.self) { k in row(humanize(k), "\(a.skipped[k] ?? 0)") }
+            if let s = a.seconds {
+                row("Days with 1-second bars", "\(s.days) of \(s.ofDays)")
+                if s.days > 0 {
+                    row("Stops settled on seconds", "\(s.exitsSettled) of \(s.stopsTotal.map(String.init) ?? "—")")
+                    if s.stopNotYetHeld > 0 { row("Touches before the broker held the stop", "\(s.stopNotYetHeld)") }
+                    if s.minutesOn1mRule > 0 { row("Minutes on the 1-minute rule (seconds incomplete)", "\(s.minutesOn1mRule)") }
+                }
+            }
         }
         Section("Assumptions") {
             row("Fill model", a.fillModel.fillModel == "honest" ? "Honest" : "Classic")
@@ -224,6 +234,7 @@ struct ResultView: View {
                 row("Oldest trade a fill may use", a.fillModel.fillMaxAgeMin.map { "\($0) min" })
                 row("Cost stress", a.fillModel.costStress.map { "× \($0.formatted())" })
             }
+            if let e = a.exitModel { row("Stops checked on", e) }
             row("Stop order", a.fillModel.slOrder.map { $0 == "limit" ? "SL-limit (may stay unfilled)" : "Assumed to fill" })
             ForEach(a.lotSizesByExpiry.keys.sorted(), id: \.self) { e in
                 row("Lot size, expiry \(Fmt.marketDay(e))", (a.lotSizesByExpiry[e] ?? nil).map { "\($0)" })
@@ -395,5 +406,78 @@ struct TradeDetailView: View {
         }
         .navigationTitle("Trade \(trade.id)")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// The 1-minute vs 1-second check: the days that have 1-second bars, run both ways from flat, side by side.
+struct SecondsCheckSection: View {
+    @AppStorage("hideAmounts") private var hide = false
+    let check: JSONValue
+
+    var body: some View {
+        let rows = k(check, "rows")?.array ?? []
+        Section {
+            LabeledContent("Net on 1-minute bars", value: Fmt.rupees(k(check, "net_1m")?.number ?? 0, hidden: hide, signed: true))
+            if let e = k(check, "error")?.string {
+                Label("The check could not run: \(e)", systemImage: "exclamationmark.triangle").font(.caption)
+            }
+            LabeledContent("Net with 1-second stops", value: Fmt.rupees(k(check, "net_1s")?.number ?? 0, hidden: hide, signed: true))
+            let diff = k(check, "diff")?.number ?? 0
+            LabeledContent("Difference") {
+                Text(Fmt.rupees(diff, hidden: hide, signed: true))
+                    .foregroundStyle(diff > 0 ? Color.tdGood : diff < 0 ? Color.tdBad : .primary)
+            }
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, r in
+                let changed = k(r, "changed_exits")?.array ?? []
+                DisclosureGroup {
+                    if k(r, "diverged")?.bool == true {
+                        Text("Different trades: an earlier exit changed what was held, so exits are not paired.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else if changed.isEmpty {
+                        Text(k(r, "has_seconds")?.bool == false ? "No 1-second bars this day; same exits."
+                             : "Same exits both ways.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    ForEach(Array(changed.enumerated()), id: \.offset) { _, x in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(Fmt.contract(k(x, "symbol")?.string ?? "")).font(.caption.weight(.semibold))
+                            Text("1-min: " + leg(k(x, "minute"))).font(.caption)
+                            Text("1-sec: " + leg(k(x, "second"))).font(.caption)
+                        }
+                        .monospacedDigit()
+                    }
+                } label: {
+                    let d = k(r, "diff")?.number ?? 0
+                    HStack {
+                        Text(Fmt.marketDay(k(r, "date")?.string))
+                        Spacer()
+                        Text("stops \(Int(k(r, "stops_1m")?.number ?? 0)) → \(Int(k(r, "stops_1s")?.number ?? 0))")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text(Fmt.rupees(d, hidden: hide, signed: true))
+                            .foregroundStyle(d > 0 ? Color.tdGood : d < 0 ? Color.tdBad : .secondary)
+                    }
+                    .monospacedDigit()
+                }
+            }
+        } header: {
+            Text("1-minute vs 1-second (\(Int(k(check, "days")?.number ?? 0)) days)")
+        } footer: {
+            Text("From the first day with 1-second bars, run on the 1-minute rule and with stops settled on seconds. "
+                 + (k(check, "note")?.string ?? ""))
+        }
+    }
+
+    /// The result arrives through the app's snake_case decoder, which also renames keys inside free-form JSON
+    /// ("net_1m" -> "net1m"): look a key up either way.
+    private func k(_ j: JSONValue?, _ key: String) -> JSONValue? {
+        guard case .object(let o)? = j else { return nil }
+        if let v = o[key] { return v }
+        let parts = key.split(separator: "_").map(String.init)
+        let camel = (parts.first ?? "") + parts.dropFirst().map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined()
+        return o[camel]
+    }
+
+    private func leg(_ v: JSONValue?) -> String {
+        guard let v, v != .null, let ts = k(v, "ts")?.string else { return "no exit" }
+        return "\(humanize(k(v, "reason")?.string ?? "")) at \(Fmt.storeTime(ts, seconds: true)) · ₹\(String(format: "%.2f", k(v, "price")?.number ?? 0))"
     }
 }

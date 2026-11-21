@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     backtest_timeout_s: int = 1800
     backtest_memory_mb: int = 900          # no longer used: the cap is MemoryMax in td2-jobs.service
     backtest_duckdb_mb: int = 500          # DuckDB's working memory in a backtest (it spills to disk past this)
+    backtest_seconds: bool = True          # settle stops and targets on stored 1-second bars (the 1-minute rule elsewhere)
     # files shared with the update scripts (update-request, update-status.json, update-available.json)
     data_dir: str = "/opt/td2/data"
     live_enabled_file: str = ""   # root-owned file outside the services' write paths; present = live allowed

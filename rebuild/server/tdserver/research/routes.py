@@ -153,7 +153,7 @@ def get_run(run_id: int, p: Principal = Depends(current), ctx: AppContext = Depe
         return {**_out(r), "sweep": res["sweep"] if res else None, "params": r.params, "spec": r.spec,
                 "metrics": None, "audit": None}
     return {**_out(r), "metrics": res["summary"] if res else None, "audit": res["audit"] if res else None,
-            "spec": r.spec}
+            "seconds_check": res.get("seconds_check") if res else None, "spec": r.spec}
 
 
 @router.get("/backtests/{run_id}/curves")

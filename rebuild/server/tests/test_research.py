@@ -240,3 +240,41 @@ def test_a_run_killed_for_memory_says_so(ctx, owner, research, monkeypatch):
         r = db.get(BacktestRun, rid)
         assert r.status == "failed" and "more memory" in r.note
     assert subprocess  # (module used by jobs)
+
+
+def test_backtest_uses_stored_1_second_bars_and_checks_them_against_the_minute(client, owner, research, tmp_path):
+    """A stop triggers at 10:55:30 in the 1-second bars: the run settles it there, the audit counts the day, and the
+    1-minute vs 1-second check shows the changed exit side by side."""
+    import shutil
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    root = tmp_path / "store"
+    shutil.copytree(research.settings.store_root, root)
+    research.settings.store_root = str(root)
+    sym = f"NIFTY{EXP:%y%m%d}26000CE"
+    t0 = datetime(D1.year, D1.month, D1.day, 10, 55)
+    px = [40.0] * 30 + [82.0] + [90.0] * 29
+    d = root / "bars_1s" / "opt" / "NIFTY" / f"date={D1}"
+    d.mkdir(parents=True)
+    pq.write_table(pa.table({"ts": [t0 + timedelta(seconds=s) for s in range(60)], "symbol": [sym] * 60,
+                             "open": px, "high": px, "low": px, "close": px}), d / "kite_live_0.parquet")
+    h = owner["h"]
+    run = client.post("/v1/research/backtests", json={"template": "strangle_nifty", "start": "2026-10-12",
+                                                      "end": "2026-10-13", "overrides": {"risk.close_lone_leg_eod": False}},
+                      headers=h).json()
+    _run_queue(research)
+    got = client.get(f"/v1/research/backtests/{run['id']}", headers=h).json()
+    assert got["status"] == "done", got["note"]
+    assert got["audit"]["seconds"]["days"] == 1 and got["audit"]["seconds"]["exits_settled"] == 1
+    assert got["audit"]["exit_model"].startswith("premium stops on 1-second")
+    stop = next(f for t in client.get(f"/v1/research/backtests/{run['id']}/trades", headers=h).json()["trades"]
+                for f in t["fills"] if f["reason"] == "stop_loss")
+    assert stop["ts"] == "2026-10-12 10:55:30"
+    chk = got["seconds_check"]
+    assert chk["days"] == 1 and chk["from"] == "2026-10-12" and chk["days_different"] == 1
+    assert chk["net_1s"] - chk["net_1m"] == pytest.approx(chk["diff"]) and not chk["rows"][0]["diverged"]
+    row = chk["rows"][0]
+    ch = row["changed_exits"][0]
+    assert ch["minute"]["ts"].endswith("10:55:00") and ch["second"]["ts"].endswith("10:55:30")
+    assert ch["second"]["price"] < ch["minute"]["price"] and row["diff"] > 0      # a short stopped earlier: smaller loss
